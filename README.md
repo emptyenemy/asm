@@ -5,7 +5,8 @@ releases, install a version, and update existing installations.
 
 Version **1.0.0 is in development**. There are no published releases yet.
 The current implementation runs on Windows using a batch launcher and built-in
-Windows PowerShell. macOS and Linux support is planned.
+Windows PowerShell. It is being migrated to **Go**, with native binaries for
+Windows, macOS, and Linux.
 
 ## Getting started
 
@@ -348,13 +349,25 @@ English documentation and terminal text, the ASCII banner, indigo accents,
 aligned layouts, custom progress, and wait indicators are implemented in the
 Windows prototype. The remaining steps in this iteration are:
 
-1. **A small bootstrap installer.** Provide a copy-and-paste PowerShell command
-   with per-user installation and automatic `PATH` setup. Detect an existing
-   unrelated `asm` command and clean installer temporary files.
-2. **Platform-aware foundations.** Preserve the verified home-based manager
-   settings on Windows, macOS, and Linux. A Unix runtime must select the right
-   archive and perform that platform's SDK configuration steps. Add `install.sh`
-   alongside a working macOS/Linux implementation.
+1. **Move to Go.** Preserve the commands, terminal presentation, version
+   ordering, verified downloads, and cleanup in one small native application.
+2. **Implement platform-specific SDK setup.** Read the manager configuration
+   from the user's home directory, select the host OS archive, preserve Unix
+   executable permissions, configure Linux architecture, and handle macOS
+   quarantine. SDK installation must be tested on each host OS.
+3. **Build for supported SDK hosts.** Target Windows amd64, macOS amd64/arm64,
+   and Linux amd64/arm64. The
+   [Linux SDK documentation](https://airsdk.dev/docs/basics/install/linux)
+   explicitly supports x86_64 and ARM64; Linux SDK tools require a commercial
+   AIR license. See also the
+   [macOS](https://airsdk.dev/docs/basics/install/macos) and
+   [Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
+4. **Distribute binaries through GitHub Releases.** Build a Windows ZIP and
+   macOS/Linux tarballs with SHA-256 checksums. Regular commits validate builds;
+   publication happens when a version is ready.
+5. **Install from a release.** Provide `install.ps1` and `install.sh` that
+   select the matching binary, verify its checksum, install per user, and set
+   up `PATH`. Detect unrelated commands named `asm` and remove temporary files.
 
 Each feature is committed separately. Development continues on `1.0.0`;
 published releases and tags will be added only once that version is ready.
@@ -381,10 +394,9 @@ limited retries follow the basic commands. Flex overlays, older Adobe SDKs,
 `doctor`, completion, and APM integration are later additions. License acceptance
 remains explicit.
 
-The cross-platform implementation language is not fixed. Go is a candidate
-for a standalone binary with standard HTTP/ZIP support; Rust is an alternative.
-Measure real downloads and extraction before making speed claims. Keep the
-implementation small, adding layers only when a concrete feature needs them.
+Go is the implementation language. Use its standard HTTP/ZIP support and keep
+the application small, adding layers only when a concrete feature needs them.
+Measure real downloads and extraction before making speed claims.
 macOS/Linux SDK archives and setup must be exercised on each supported target;
 shipping an asm binary does not imply SDK availability for every architecture.
 [Linux ARM installation documentation](https://airsdk.dev/docs/basics/install/linux)
