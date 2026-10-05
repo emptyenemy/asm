@@ -398,11 +398,7 @@ function Update-Sdks {
     $sdks = @(Get-InstalledSdks | Where-Object {
         -not $filter -or $_.Version.ToString() -eq $filter -or $_.Version.ToString().StartsWith($filter + '.')
     })
-    if (-not $sdks.Count) {
-        if ($filter) { throw "No installed SDK matches $filter. Run asm list." }
-        'No local AIR SDK versions found.'
-        return
-    }
+    if (-not $sdks.Count -and $filter) { throw "No installed SDK matches $filter. Run asm list." }
     $versions = @(Get-ReleaseVersions)
     $updates = @(
         foreach ($sdk in $sdks) {
@@ -413,13 +409,28 @@ function Update-Sdks {
             if ($latest) { [pscustomobject]@{ Sdk = $sdk; Available = $latest } }
         }
     )
-    if (-not $updates.Count) { 'No AIR SDK updates found.'; return }
-    '{0,-14} {1,-14} {2}' -f 'Installed', 'Available', 'Path'
-    foreach ($update in $updates) {
-        '{0,-14} {1,-14} {2}' -f $update.Sdk.Version, $update.Available, $update.Sdk.Path
+    if ($updates.Count) {
+        '{0,-14} {1,-14} {2}' -f 'Installed', 'Available', 'Path'
+        foreach ($update in $updates) {
+            '{0,-14} {1,-14} {2}' -f $update.Sdk.Version, $update.Available, $update.Sdk.Path
+        }
+    } elseif ($sdks.Count) { 'Installed SDKs are up to date.' }
+    else { 'No local AIR SDK versions found.' }
+    if (-not $filter) {
+        $latestRelease = $versions | Sort-Object -Descending | Select-Object -First 1
+        $newestInstalled = $sdks | Sort-Object Version -Descending | Select-Object -First 1
+        $installedBranch = $sdks | Where-Object {
+            $_.Version.Major -eq $latestRelease.Major -and $_.Version.Minor -eq $latestRelease.Minor -and
+            $_.Version.Build -eq $latestRelease.Build
+        }
+        if ($latestRelease -and (-not $newestInstalled -or $latestRelease -gt $newestInstalled.Version) -and -not $installedBranch) {
+            ''
+            "New AIR SDK available: $latestRelease"
+            'Install: asm install {0}.{1}' -f $latestRelease.Major, $latestRelease.Minor
+        }
     }
     $apply = ($filter -or $env:ASM_UPDATE_ALL) -and -not $env:ASM_UPDATE_CHECK
-    if (-not $apply) { return }
+    if (-not $updates.Count -or -not $apply) { return }
     if (-not $env:ASM_ACCEPT_LICENSE -and (Get-ManagerSetting 'HAS_ACCEPTED_LICENSE') -ne 'true') {
         throw 'Accept the AIR SDK license using --accept-license, or use AIR SDK Manager first.'
     }

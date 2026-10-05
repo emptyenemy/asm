@@ -119,12 +119,13 @@ exit /b %errorlevel%
 if not "%~3"=="" goto unexpected_arguments
 echo Usage: asm update [VERSION] [--all] [--check] [--accept-license]
 echo.
-echo No arguments: show available updates without changing SDK files.
+echo No arguments: show installed SDK updates and a new SDK branch, if available.
 echo --all: update all installed SDKs that have a newer build.
 echo VERSION: update matching installed SDKs. Example: asm update 51.3.
 echo --check: only show updates, including when VERSION or --all is given.
 echo --accept-license: accept the AIR SDK license for this operation.
 echo Updates keep each SDK's three-component version and existing path.
+echo New branches are announced with an asm install command.
 exit /b 0
 
 
