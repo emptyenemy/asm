@@ -172,7 +172,11 @@ func fixtureAPI(t *testing.T, a *app, recipe string) func() []string {
 	if a.os == "windows" {
 		adt += ".bat"
 	}
-	archive := fixtureZIP(t, map[string]string{adt: "fixture", "lib/adt.jar": strings.Repeat("fixture", 12000), "lib/adt.cfg": "new config"})
+	files := map[string]string{adt: "fixture", "lib/adt.jar": strings.Repeat("fixture", 12000), "lib/adt.cfg": "new config"}
+	if a.os == "linux" {
+		files["bin/configure_linux.sh"] = "#!/bin/sh\nexit 0\n"
+	}
+	archive := fixtureZIP(t, files)
 	if recipe == "traversal" {
 		archive = fixtureZIP(t, map[string]string{"../escaped.txt": "bad"})
 	}

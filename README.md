@@ -372,6 +372,29 @@ use `--version` for an exact package version; apt uses `PKG=VERSION`. Short AIR
 version resolution is an asm-specific rule. New short flags need unambiguous
 help because other managers assign them different meanings.
 
+## Builds and releases
+
+The GitHub Actions `Build` workflow runs tests and `go vet` on native runners
+and builds these targets:
+
+| Host | Go target | Release archive |
+| --- | --- | --- |
+| Windows x64 | `windows/amd64` | `asm_<version>_windows_amd64.zip` |
+| macOS Intel | `darwin/amd64` | `asm_<version>_darwin_amd64.tar.gz` |
+| macOS Apple Silicon | `darwin/arm64` | `asm_<version>_darwin_arm64.tar.gz` |
+| Linux x64 | `linux/amd64` | `asm_<version>_linux_amd64.tar.gz` |
+| Linux ARM64 | `linux/arm64` | `asm_<version>_linux_arm64.tar.gz` |
+
+Each archive contains the executable and README. Ordinary commits and pull
+requests produce workflow artifacts kept for seven days. Pushing a version
+tag such as `v1.0.0` publishes the five archives and `SHA256SUMS` to
+[GitHub Releases](https://github.com/emptyenemy/asm/releases) after every build
+passes. The tag supplies the binary version, without the `v` prefix.
+Releases use Go 1.27; their OS minimums follow that toolchain.
+
+Version 1.0.0 is still being developed. No version tag or release has been
+published as part of this migration.
+
 ## Current development plan
 
 The Go CLI implements the existing commands, `uninstall`/`remove`, terminal
@@ -388,10 +411,7 @@ setup. The remaining steps in this iteration are:
    [Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
    Full SDK/tool checks on each host are still required before calling the
    first version ready.
-2. **Distribute binaries through GitHub Releases.** Build a Windows ZIP and
-   macOS/Linux tarballs with SHA-256 checksums. Regular commits validate builds;
-   publication happens when a version is ready.
-3. **Install from a release.** Provide `install.ps1` and `install.sh` that
+2. **Install from a release.** Provide `install.ps1` and `install.sh` that
    select the matching binary, verify its checksum, install per user, and set
    up `PATH`. Detect unrelated commands named `asm` and remove temporary files.
 

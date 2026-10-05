@@ -1,0 +1,108 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            os: windows
+            arch: amd64
+          - runner: macos-15-intel
+            os: darwin
+            arch: amd64
+          - runner: macos-15
+            os: darwin
+            arch: arm64
+          - runner: ubuntu-24.04
+            os: linux
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            os: linux
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.x'
+          cache: false
+      - name: Check
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Build and package
+        shell: bash
+        env:
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          set -eu
+          test "$(go env GOOS)" = "$TARGET_OS"
+          test "$(go env GOARCH)" = "$TARGET_ARCH"
+          release_version="1.0.0"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            release_version="${GITHUB_REF_NAME#v}"
+          fi
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          name="asm_${release_version}_${TARGET_OS}_${TARGET_ARCH}"
+          mkdir -p "dist/$name"
+          executable=asm
+          if [ "$TARGET_OS" = windows ]; then executable=asm.exe; fi
+          go build -trimpath -ldflags "-s -w -X main.version=$release_version" -o "dist/$name/$executable" .
+          "dist/$name/$executable" --version
+          cp README.md "dist/$name/README.md"
+          if [ "$TARGET_OS" = windows ]; then
+            archive="$name.zip"
+            powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/$name/*' -DestinationPath 'dist/$archive'"
+          else
+            archive="$name.tar.gz"
+            tar -czf "dist/$archive" -C "dist/$name" asm README.md
+          fi
+          python=python3
+          if [ "$TARGET_OS" = windows ]; then python=python; fi
+          ARCHIVE="$archive" "$python" -c 'import hashlib, os, pathlib; p = pathlib.Path("dist") / os.environ["ARCHIVE"]; (pathlib.Path("dist") / (p.name + ".sha256")).write_text(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n")'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: asm-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: asm-*
+          merge-multiple: true
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          cat dist/*.sha256 > dist/SHA256SUMS
+          printf '%s\n' 'Native AIR SDK manager binaries for Windows, macOS, and Linux.' '' 'Choose the archive matching the host OS and architecture. SHA256SUMS contains the archive checksums.' '' 'Documentation: https://github.com/emptyenemy/asm#readme' > release-notes.md
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.tar.gz dist/SHA256SUMS --verify-tag --title "asm $GITHUB_REF_NAME" --notes-file release-notes.md
