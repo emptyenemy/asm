@@ -85,10 +85,12 @@ Redirected search results remain one full version per line, without headings or
 installation suggestions. `--version` and `-v` print only `1.0.0`, accented in
 an interactive terminal and plain when redirected or with `NO_COLOR`.
 
-Source files stay in one package: `main.go` handles commands and settings,
-`sdk.go` handles catalogs and SDK assembly, and `terminal.go` handles output.
-`platform_windows.go` and `platform_unix.go` contain terminal, locking, and
-platform setup. No external Go modules or terminal UI library are required.
+The root `main.go` starts the CLI and supplies its build version. Implementation
+files and tests live in one `modules` package: `app.go` handles commands and
+settings, `sdk.go` handles catalogs and SDK assembly, and `terminal.go` handles
+output. `platform_windows.go` and `platform_unix.go` contain terminal, locking,
+and platform setup. `go.mod` declares the project's import path and minimum Go
+version. No external dependencies or terminal UI library are required.
 
 ## Commands
 

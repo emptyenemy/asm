@@ -1,4 +1,4 @@
-package main
+package modules
 
 import (
 	"archive/zip"
@@ -45,7 +45,7 @@ func testApp(t *testing.T) (*app, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	var out, stderr bytes.Buffer
 	ui := &terminal{out: &out, err: &stderr, width: func() int { return 80 }}
-	a := newApp(context.Background(), ui)
+	a := newApp(context.Background(), ui, "1.0.0")
 	a.configFile = filepath.Join(t.TempDir(), ".airsdk", "airsdkmanager.cfg")
 	a.settings = map[string]string{"AIR_SDKS": filepath.Join(t.TempDir(), "SDKs [local] пробел"), "HAS_ACCEPTED_LICENSE": "true"}
 	if err := os.MkdirAll(a.settings["AIR_SDKS"], 0755); err != nil {

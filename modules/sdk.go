@@ -1,4 +1,4 @@
-package main
+package modules
 
 import (
 	"archive/zip"
@@ -48,7 +48,7 @@ func (a *app) request(ctx context.Context, method, address string) (*http.Respon
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "asm/"+version)
+	req.Header.Set("User-Agent", "asm/"+a.version)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}

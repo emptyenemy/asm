@@ -1,4 +1,4 @@
-package main
+package modules
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 )
 
 type terminal struct {
+	version            string
 	out, err           io.Writer
 	interactive, color bool
 	width              func() int
@@ -20,7 +21,7 @@ func newTerminal(out, err *os.File) *terminal {
 	interactive := terminalWidth(out) > 0 && terminalWidth(err) > 0 && os.Getenv("TERM") != "dumb"
 	_, noColor := os.LookupEnv("NO_COLOR")
 	color := interactive && !noColor && enableColor(out, err)
-	return &terminal{out, err, interactive, color, func() int {
+	return &terminal{out: out, err: err, interactive: interactive, color: color, width: func() int {
 		if n := terminalWidth(out); n > 0 {
 			return n
 		}
@@ -230,7 +231,7 @@ func (t *terminal) help(topic string) {
 			t.line("  asm", "accent")
 		}
 		t.line("", "")
-		t.wrap("AIR SDK Manager  "+version, 2, "muted")
+		t.wrap("AIR SDK Manager  "+t.version, 2, "muted")
 		t.line("", "")
 		t.wrap("Usage: asm <command> [options]", 2, "")
 		t.line("", "")
