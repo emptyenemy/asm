@@ -4,13 +4,18 @@ A command-line version manager for AIR SDK. List installed SDKs, find available
 releases, install a version, and update existing installations.
 
 Version **1.0.0 is in development**. There are no published releases yet.
-The current implementation runs on Windows using a batch launcher and built-in
-Windows PowerShell. It is being migrated to **Go**, with native binaries for
-Windows, macOS, and Linux.
+The implementation uses **Go** and its standard library. One native executable
+runs on Windows, macOS, or Linux without PowerShell or a Go installation.
 
 ## Getting started
 
-From the project directory in cmd:
+During development, build from source with Go 1.25 or newer:
+
+```sh
+go build .
+```
+
+From the project directory in cmd after building:
 
 ```bat
 asm --version
@@ -20,10 +25,9 @@ asm install 51.4
 asm update
 ```
 
-In PowerShell, use `./asm.bat`, for example `./asm.bat install 51.4`.
-Until the bootstrap installer is implemented, add the project directory to
-`PATH` to run `asm` from other directories. Keep the launcher and its PowerShell
-files together. `asm --version` and `asm -v` print exactly `1.0.0`.
+In PowerShell, use `./asm.exe`; on macOS/Linux, use `./asm`. Add the executable's
+directory to `PATH` to run `asm` from other directories. `asm --version` and
+`asm -v` print only `1.0.0`, with an indigo accent in an interactive terminal.
 
 ## SDK locations and configuration
 
@@ -35,10 +39,9 @@ AIR_SDKS=C:\AIRSDK
 HAS_ACCEPTED_LICENSE=true
 ```
 
-The Windows implementation reads
-`%USERPROFILE%\.airsdk\airsdkmanager.cfg`. No directory argument is needed for
-each command. SDK discovery through `PATH` and additional saved roots are
-planned.
+asm reads `~/.airsdk/airsdkmanager.cfg`, using the current user's home directory
+on each OS (`%USERPROFILE%` on Windows). No directory argument is needed for
+each command. SDK discovery through `PATH` and additional saved roots are planned.
 
 Downloading requires acceptance of the AIR SDK license: either
 `HAS_ACCEPTED_LICENSE=true` in the manager configuration, or `--accept-license`
@@ -58,8 +61,8 @@ gives the following locations:
 | macOS | `~/.airsdk/airsdkmanager.cfg`, usually `/Users/<user>/.airsdk/airsdkmanager.cfg` | Same database name and `AIR_SDKS` setting. |
 | Linux | `~/.airsdk/airsdkmanager.cfg`, usually `/home/<user>/.airsdk/airsdkmanager.cfg` | Same database name and `AIR_SDKS` setting. |
 
-These paths are established from the manager code and runtime documentation;
-the asm prototype has only been exercised on Windows. The manager uses the
+These paths are established from the manager code and runtime documentation.
+Command and fixture checks have run on Windows and Linux. The manager uses the
 home directory directly, rather than macOS Application Support or an XDG
 configuration directory. Nonstandard home directories must also work.
 
@@ -72,8 +75,8 @@ next command. Narrow terminals use stacked entries and wrapped paths.
 Catalog and manifest requests display a spinner. Downloads use a custom bar
 with transferred bytes, percentage when the total is known, and average speed.
 Unknown-size downloads show activity and bytes without inventing a percentage.
-Hash verification and extraction also display activity. PowerShell's native
-progress display is disabled.
+SHA-256 is calculated while streaming the download; extraction and platform
+configuration also display activity. Progress is rendered directly by asm.
 
 Progress goes to stderr and clears on completion or error. Redirecting either
 output stream disables colors and animation; `TERM=dumb` does the same.
@@ -82,9 +85,10 @@ Redirected search results remain one full version per line, without headings or
 installation suggestions. `--version` and `-v` print only `1.0.0`, accented in
 an interactive terminal and plain when redirected or with `NO_COLOR`.
 
-The runtime remains small: `asm.bat` dispatches commands, `sdk.ps1` manages SDKs,
-and `terminal.ps1` handles presentation and HTTP transfers. Keep these files
-together; no external terminal UI library is required.
+Source files stay in one package: `main.go` handles commands and settings,
+`sdk.go` handles catalogs and SDK assembly, and `terminal.go` handles output.
+`platform_windows.go` and `platform_unix.go` contain terminal, locking, and
+platform setup. No external Go modules or terminal UI library are required.
 
 ## Commands
 
@@ -95,6 +99,7 @@ together; no external terminal UI library is required.
 | `asm list`, `asm ls` | List installed SDK versions and absolute paths. |
 | `asm search [VERSION]` | List announced stable releases, newest first. |
 | `asm install VERSION` | Install a branch, an exact build, or `latest`. |
+| `asm uninstall VERSION`, `asm remove VERSION` | Delete one installed SDK selected by exact version or an unambiguous prefix. |
 | `asm update` | Show updates for installed SDKs and announce a newer uninstalled branch. |
 | `asm update VERSION` | Update matching installed SDKs. |
 | `asm update --all` | Update every installed SDK that has a newer build. |
@@ -209,16 +214,41 @@ No matching installation is an error with an `asm list` suggestion. No available
 update is a successful result. `--all` processes SDKs sequentially and stops at
 the first error; completed updates remain installed.
 
+### Uninstall
+
+```sh
+asm uninstall 51.4
+asm uninstall 51.3.4.3
+asm remove 51.4.1.1
+```
+
+An exact build or a prefix must match exactly one installed SDK. Ambiguous
+prefixes show the matching versions and paths and return an error; no SDK is
+deleted. No match is also an error. `latest`, `--all`, and removing several
+versions in one command are not supported.
+
+The command deletes the selected SDK directory directly, without keeping a
+backup. It validates the SDK description and its location below `AIR_SDKS`,
+rejects symbolic-link directories, and shares the install/update lock. Manager
+settings, other SDKs, and `PATH` remain unchanged. If files are locked or removal
+otherwise fails, the error identifies the directory that needs attention.
+
 ## Downloads and cleanup
 
 `install` and `update` share SDK assembly logic. By default, asm downloads the
-full Windows archive with the compiler using shockpkg metadata and archive.org.
+full host OS archive with the compiler using shockpkg metadata and archive.org.
 An explicit `API_ENDPOINT` enables that API's manifest or an exact manifest
-from the manager database. Windows component recipes exclude `linux` and
-`macos`, retaining common tools, Windows, Android, and iPhone components.
+from the manager database. Component recipes select `window`, `macos`, or
+`linux` for the current host and retain common tools, Android, and iPhone
+components. Other desktop OS components are excluded.
 
 Files are assembled in a temporary directory inside `AIR_SDKS`. Download size,
-SHA-256, ZIP paths, `bin\adt.bat`, and `lib\adt.jar` are checked. A compatible
+SHA-256, ZIP paths, the host's `bin/adt` (`adt.bat` on Windows), and `lib/adt.jar`
+are checked. Unix executable permissions and safe relative symbolic links are
+preserved. Linux SDKs run `configure_linux.sh` when provided; ARM64 requires
+that script and passes `arm64`. Legacy Linux runtime/library paths are corrected
+as in the inspected manager. macOS quarantine is inspected and removed if
+present, without requesting administrator privileges. A compatible
 `air-sdk-description.xml` is generated before the installation is moved into
 place. Download or extraction failures leave existing SDKs untouched.
 
@@ -259,7 +289,7 @@ the fallback. There is no `--source` command option yet.
 
 | Source | Use and findings |
 | --- | --- |
-| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON catalog](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Default recipe: `air-sdk-<full-version>-windows-compiler`, using `source`, `sha256`, and `size`. Other platforms are also listed. A 32-byte probe of Windows SDK `51.3.4.3` returned HTTP 206 and a ZIP signature in 1.8 seconds. Hashes come from shockpkg. |
+| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON catalog](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Default recipe: `air-sdk-<full-version>-<windows\|mac\|linux>-compiler`, using `source`, `sha256`, and `size`. The `51.4.1.1` catalog contains all three host archives. A 32-byte probe of Windows SDK `51.3.4.3` returned HTTP 206 and a ZIP signature in 1.8 seconds. Hashes come from shockpkg. |
 | HARMAN components | Native manager recipe: `POST /releases/components/<name>/<component-version>` with form data `acceptedLicense=true`. Probes returned 403. Supported for an explicit endpoint with component metadata. |
 | HARMAN full archives | Fallback recipe: `urls.AIR_Win` with `url`, `checksum`, and `fileSize`. Relative URLs use `https://airsdk.harman.com`; that site's URLs receive `license=accepted`. A direct probe returned 403. |
 | [HARMAN website API](https://airsdk.harman.com/download) | Investigated `/api/versions/release-notes`, `/api/config-settings/download`, and `/api/versions/<full-version>`. Probes exceeded 15 seconds, including requests with browser headers. Worth checking again if service availability changes. |
@@ -298,10 +328,9 @@ The main references were `AIRSDKAPI`, `AIRSDKBuild`, `AIRSDKDescription`,
 
 The inspected `51.4.1.1` manifest contained `linux`, `core-tools`, `iphone`,
 `air-tools`, `macos`, `window`, and `android`. The GUI caches component archives;
-asm removes them after extraction. Future Unix support must also implement
-platform steps such as Linux configuration, executable permissions, and macOS
-quarantine handling. Manager binaries and decompilation are excluded from this
-repository.
+asm removes them after extraction. The Go implementation includes Linux
+configuration, executable permissions, safe symbolic links, and macOS quarantine
+handling. Manager binaries and decompilation are excluded from this repository.
 
 ## Related projects and command naming
 
@@ -331,7 +360,7 @@ The planned installer must detect conflicting commands before adding asm to
 | Installed | `list --installed` | `list` | `list` | `list`, `ls` |
 | Update installed | `upgrade` | `upgrade`, alias `update` | `upgrade` | `update` |
 | Refresh catalog | `update` | `source update` | No separate `update` command listed | Automatic before search and update checks |
-| Remove | `remove` | `uninstall` | `uninstall` | Planned `uninstall`, alias `remove` |
+| Remove | `remove` | `uninstall` | `uninstall` | `uninstall VERSION`, alias `remove` |
 | Details | `show` | `show` | `info` | Planned `show`, alias `info` |
 
 The chosen SDK-update name is `update`. Its default preview and `--all` behavior
@@ -345,27 +374,24 @@ help because other managers assign them different meanings.
 
 ## Current development plan
 
-English documentation and terminal text, the ASCII banner, indigo accents,
-aligned layouts, custom progress, and wait indicators are implemented in the
-Windows prototype. The remaining steps in this iteration are:
+The Go CLI implements the existing commands, `uninstall`/`remove`, terminal
+presentation, home-based configuration, host archive selection, and platform
+setup. The remaining steps in this iteration are:
 
-1. **Move to Go.** Preserve the commands, terminal presentation, version
-   ordering, verified downloads, and cleanup in one small native application.
-2. **Implement platform-specific SDK setup.** Read the manager configuration
-   from the user's home directory, select the host OS archive, preserve Unix
-   executable permissions, configure Linux architecture, and handle macOS
-   quarantine. SDK installation must be tested on each host OS.
-3. **Build for supported SDK hosts.** Target Windows amd64, macOS amd64/arm64,
-   and Linux amd64/arm64. The
+1. **Validate supported SDK hosts.** Target Windows amd64, macOS amd64/arm64,
+   and Linux amd64/arm64. Builds exist for all five targets; fixture tests have
+   run on Windows and Linux. The
    [Linux SDK documentation](https://airsdk.dev/docs/basics/install/linux)
    explicitly supports x86_64 and ARM64; Linux SDK tools require a commercial
    AIR license. See also the
    [macOS](https://airsdk.dev/docs/basics/install/macos) and
    [Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
-4. **Distribute binaries through GitHub Releases.** Build a Windows ZIP and
+   Full SDK/tool checks on each host are still required before calling the
+   first version ready.
+2. **Distribute binaries through GitHub Releases.** Build a Windows ZIP and
    macOS/Linux tarballs with SHA-256 checksums. Regular commits validate builds;
    publication happens when a version is ready.
-5. **Install from a release.** Provide `install.ps1` and `install.sh` that
+3. **Install from a release.** Provide `install.ps1` and `install.sh` that
    select the matching binary, verify its checksum, install per user, and set
    up `PATH`. Detect unrelated commands named `asm` and remove temporary files.
 
@@ -377,7 +403,6 @@ published releases and tags will be added only once that version is ready.
 | Capability | Intended behavior |
 | --- | --- |
 | `show [VERSION]`, `info` | Display date, size, platform, and source. |
-| `uninstall VERSION`, `remove` | Remove an exact installed build using a verified path. |
 | `path [VERSION]` | Print an installed or selected SDK path for IDEs and scripts. |
 | `use VERSION` | Save an exact build in the project's `.asm-version`. |
 | `use --global VERSION`, `current` | A user default and effective selection; storage location remains undecided. |
@@ -404,10 +429,12 @@ is a starting point.
 
 ## Validation
 
-Development checks use small SDK/ZIP fixtures, an isolated manager profile, and
-a local HTTP server. Existing checks covered numeric versions, idempotent
-installation, paths with spaces and Unicode, licenses, catalog errors, hashes,
-sizes, ZIP traversal, SDK structure, locking, destination races, cleanup,
-rollback, configuration/license preservation, partial `--all` failure, and
-new-branch notifications. Complete SDK downloads and tools need separate
-validation on each platform before a cross-platform release.
+Run `go test ./...` and `go vet ./...`. Tests create small SDK/ZIP fixtures in
+temporary directories and use local HTTP servers. They exercise numeric
+versions, idempotent installation, spaces/Unicode, licenses, source failures,
+hashes, sizes, ZIP traversal, SDK structure, locking, occupied destinations,
+cleanup, configuration/license preservation, new-branch notifications, and
+uninstall ambiguity. Linux checks also cover architecture setup and legacy
+path corrections; Unix checks cover symbolic links. Test directories are
+removed automatically. Full SDK downloads and tools still need separate
+validation on each target.

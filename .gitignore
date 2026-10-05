@@ -2,4 +2,6 @@
 /AIRSDKManager_*.zip
 /.asm/
 /dist/
+/asm
+/asm.exe
 *.download
