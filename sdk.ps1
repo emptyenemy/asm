@@ -1,7 +1,9 @@
-param([ValidateSet('list', 'search', 'update', 'install')][string]$Command = 'list')
+param([ValidateSet('list', 'search', 'update', 'install', 'help')][string]$Command = 'list', [string]$Topic = '')
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+. (Join-Path $PSScriptRoot 'terminal.ps1')
 $configFile = Join-Path $env:USERPROFILE '.airsdk\airsdkmanager.cfg'
 
 function Get-ManagerSetting([string]$Name) {
@@ -36,7 +38,7 @@ function Read-Sdk([IO.DirectoryInfo]$Directory) {
         }
         [pscustomobject]@{ Version = [version]$number; Path = $Directory.FullName }
     } catch {
-        [Console]::Error.WriteLine("Warning: Cannot read SDK description in {0}: {1}", $Directory.FullName, $_.Exception.Message)
+        Write-AsmLine ("Warning: Cannot read SDK description in {0}: {1}" -f $Directory.FullName, $_.Exception.Message) -Stderr
     }
 }
 
@@ -65,8 +67,12 @@ function Get-InstalledSdks {
 
 function Show-InstalledSdks {
     $sdks = @(Get-InstalledSdks)
-    if ($sdks.Count -eq 0) { 'No local AIR SDK versions found.' }
-    else { foreach ($sdk in $sdks) { '{0,-14} {1}' -f $sdk.Version, $sdk.Path } }
+    Write-AsmHeading 'Installed AIR SDKs'
+    if ($sdks.Count -eq 0) { Write-AsmLine 'No local AIR SDK versions found.' }
+    else {
+        $rows = @(foreach ($sdk in $sdks) { ,@($sdk.Version.ToString(), $sdk.Path) })
+        Write-AsmRows $rows @('Version', 'Path')
+    }
 }
 
 function Convert-Releases($Releases) {
@@ -105,7 +111,7 @@ function Get-CachedCatalog {
 }
 
 function Get-NewsVersions {
-    $html = (Invoke-WebRequest -UseBasicParsing -Uri 'https://airsdk.dev/news/archive' -TimeoutSec 15 -UserAgent 'asm/1.0.0').Content
+    $html = Invoke-AsmRequest 'https://airsdk.dev/news/archive' 'Checking AIR SDK releases'
     $previews = @('51.0.0.2', '51.0.0.4')
     $pattern = '(?is)<a\b[^>]*\bhref="/news/\d{4}/\d{2}/\d{2}/[^"\s]+"[^>]*>(?<title>.*?)</a>'
     $versions = @(
@@ -126,7 +132,7 @@ function Get-ReleaseVersions {
     try {
         if ($endpoint) {
             $uri = $endpoint.TrimEnd('/') + '/releases?types=production'
-            $response = Invoke-RestMethod -Uri $uri -Method Get -TimeoutSec 15 -UserAgent 'asm/1.0.0'
+            $response = (Invoke-AsmRequest $uri 'Checking AIR SDK releases') | ConvertFrom-Json
             if ($response.errorType) { throw "AIR SDK API returned $($response.errorType)." }
             if ($response.releases -isnot [array]) { throw 'AIR SDK API response has no releases array.' }
             $versions = @(Convert-Releases $response.releases)
@@ -135,7 +141,7 @@ function Get-ReleaseVersions {
         $apiError = $_.Exception.Message
         $cache = Get-CachedCatalog
         if (-not $cache) { throw "Cannot load AIR SDK catalog: $apiError" }
-        [Console]::Error.WriteLine("Warning: {0} Using cached AIR SDK Manager catalog: {1}", $apiError, $cache.File)
+        Write-AsmLine ("Warning: {0} Using cached AIR SDK Manager catalog: {1}" -f $apiError, $cache.File) -Stderr
         $versions = $cache.Versions
     }
     $versions
@@ -153,17 +159,27 @@ function Search-Sdks {
             -not $filter -or $_.ToString() -eq $filter -or $_.ToString().StartsWith($filter + '.')
         } | Sort-Object -Unique -Descending
     )
-    if ($matches.Count -eq 0) { 'No matching AIR SDK versions found.' }
-    else { foreach ($version in $matches) { $version.ToString() } }
+    Write-AsmHeading 'Available AIR SDKs'
+    if ($matches.Count -eq 0) { Write-AsmLine 'No matching AIR SDK versions found.' }
+    else {
+        foreach ($version in $matches) {
+            $prefix = if ($script:AsmInteractive) { '  ' } else { '' }
+            Write-AsmLine ($prefix + $version) 'Accent'
+        }
+        if ($script:AsmInteractive) {
+            Write-AsmLine
+            Write-AsmWrapped ('Install: asm install ' + $matches[0]) 2 'Muted'
+        }
+    }
 }
 
 
 function Get-WindowsPackage([version]$Version) {
-    $catalog = Invoke-RestMethod -Uri 'https://shockpkg.github.io/packages/api/1/packages.json' -TimeoutSec 15
+    $catalog = (Invoke-AsmRequest 'https://shockpkg.github.io/packages/api/1/packages.json' 'Finding the Windows SDK download') | ConvertFrom-Json
     if ($catalog.packages -isnot [array]) { throw 'Invalid shockpkg SDK catalog.' }
     $package = $catalog.packages | Where-Object { $_.name -eq "air-sdk-$Version-windows-compiler" } | Select-Object -First 1
     if (-not $package) { throw "No Windows SDK download found for $Version." }
-    [Console]::Error.WriteLine('Using the shockpkg download mirror with SHA-256 verification.')
+    Write-AsmLine 'Using the shockpkg download mirror with SHA-256 verification.' 'Muted' -Stderr
     [pscustomobject]@{
         name = $Version.ToString()
         type = 'production'
@@ -196,7 +212,7 @@ function Get-SdkManifest([version]$Version) {
     }
     $endpoint = Get-ManagerSetting 'API_ENDPOINT'
     if ($endpoint) {
-        $manifest = Invoke-RestMethod -Uri ($endpoint.TrimEnd('/') + '/releases/' + $Version + '?types=production') -TimeoutSec 15
+        $manifest = (Invoke-AsmRequest ($endpoint.TrimEnd('/') + '/releases/' + $Version + '?types=production') 'Loading the SDK manifest') | ConvertFrom-Json
         if ($manifest.name -ne $Version.ToString() -or $manifest.type -ne 'production') {
             throw "Invalid manifest for AIR SDK $Version."
         }
@@ -207,8 +223,16 @@ function Get-SdkManifest([version]$Version) {
 function Get-ArchiveHash([string]$File) {
     $stream = [IO.File]::OpenRead($File)
     $algorithm = [Security.Cryptography.SHA256]::Create()
-    try { [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
-    finally { $stream.Dispose(); $algorithm.Dispose() }
+    Start-AsmActivity 'Verifying SHA-256'
+    try {
+        $buffer = [byte[]]::new(1048576)
+        while (($count = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $algorithm.TransformBlock($buffer, 0, $count, $buffer, 0) | Out-Null
+            Update-AsmActivity
+        }
+        $algorithm.TransformFinalBlock([byte[]]::new(0), 0, 0) | Out-Null
+        [BitConverter]::ToString($algorithm.Hash).Replace('-', '').ToLowerInvariant()
+    } finally { $stream.Dispose(); $algorithm.Dispose(); Stop-AsmActivity }
 }
 
 function Get-SdkArchive([string]$Url, [string]$Checksum, [long]$Size, [string]$Name, [string]$Destination, [string]$Method = 'Get') {
@@ -217,14 +241,8 @@ function Get-SdkArchive([string]$Url, [string]$Checksum, [long]$Size, [string]$N
     $file = Get-ChildPath (Join-Path $Destination ('.asm-download-' + [guid]::NewGuid().ToString('N') + '.zip')) $Destination
     $temporary = $file + '.download'
     try {
-        Write-Host "Downloading $Name..."
-        $arguments = @{ Uri = $Url; Method = $Method; OutFile = $temporary; TimeoutSec = 600; UseBasicParsing = $true }
-        if ($Method -eq 'Post') { $arguments.Body = @{ acceptedLicense = 'true' } }
-        Push-Location -LiteralPath $Destination
-        try {
-            $arguments.OutFile = [IO.Path]::GetFileName($temporary)
-            Invoke-WebRequest @arguments | Out-Null
-        } finally { Pop-Location }
+        if ($script:AsmInteractive) { Write-AsmLine ("Downloading $Name") 'Accent' -Stderr }
+        Invoke-AsmRequest $Url "Downloading $Name" $temporary $Size $Method 600
         if ($Size -gt 0 -and (Get-Item -LiteralPath $temporary).Length -ne $Size) { throw "Download size mismatch for $Name." }
         if ((Get-ArchiveHash $temporary) -ne $Checksum) { throw "SHA-256 mismatch for $Name." }
         [IO.File]::Move($temporary, $file)
@@ -245,22 +263,37 @@ function Get-ChildPath([string]$Path, [string]$Root) {
 
 function Expand-SdkArchive([string]$File, [string]$Destination) {
     $archive = $null
+    Start-AsmActivity 'Extracting the SDK'
     try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $archive = [IO.Compression.ZipFile]::OpenRead($File)
+        $buffer = [byte[]]::new(1048576)
         foreach ($entry in $archive.Entries) {
+            Update-AsmActivity
             if ($entry.FullName -match ':|^[/\\]') { throw "Invalid ZIP entry: $($entry.FullName)" }
             $target = Get-ChildPath (Join-Path $Destination $entry.FullName) $Destination
             if ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\')) {
                 [IO.Directory]::CreateDirectory($target) | Out-Null
             } else {
                 [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+                $source = $entry.Open()
+                $destinationStream = $null
+                try {
+                    $destinationStream = [IO.File]::Create($target)
+                    while (($count = $source.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                        $destinationStream.Write($buffer, 0, $count)
+                        Update-AsmActivity
+                    }
+                } finally {
+                    if ($destinationStream) { $destinationStream.Dispose() }
+                    $source.Dispose()
+                }
             }
         }
     } finally {
         if ($archive) { $archive.Dispose() }
         if ([IO.File]::Exists($File)) { Remove-Item -LiteralPath $File -Force }
+        Stop-AsmActivity
     }
 }
 
@@ -327,7 +360,8 @@ function Install-SdkUpdate($Sdk, [version]$Version) {
         }
         $safeBackup = Get-ChildPath $backup $root
         Remove-Item -LiteralPath $safeBackup -Recurse -Force
-        "Updated $($Sdk.Version) -> $Version at $current"
+        Write-AsmLine ("Updated $($Sdk.Version) -> $Version") 'Accent'
+        Write-AsmLine ("Path: $current") 'Muted'
     } finally {
         if ([IO.Directory]::Exists($stage)) {
             $safeStage = Get-ChildPath $stage $root
@@ -355,7 +389,7 @@ function Install-Sdk {
     }
     if ([IO.Directory]::Exists($root)) {
         $installed = Get-InstalledSdks | Where-Object { $_.Version -eq $version } | Select-Object -First 1
-        if ($installed) { "AIR SDK $version is already installed at $($installed.Path)"; return }
+        if ($installed) { Write-AsmLine ("AIR SDK $version is already installed at $($installed.Path)"); return }
     }
     $destination = Get-ChildPath (Join-Path $root ('AIRSDK_' + $version)) $root
     if ([IO.Directory]::Exists($destination) -or [IO.File]::Exists($destination)) {
@@ -371,15 +405,17 @@ function Install-Sdk {
         $lockFile = Join-Path $root '.asm-update.lock'
         $lock = [IO.FileStream]::new($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None, 4096, [IO.FileOptions]::DeleteOnClose)
         $installed = Get-InstalledSdks | Where-Object { $_.Version -eq $version } | Select-Object -First 1
-        if ($installed) { "AIR SDK $version is already installed at $($installed.Path)"; return }
+        if ($installed) { Write-AsmLine ("AIR SDK $version is already installed at $($installed.Path)"); return }
         if ([IO.Directory]::Exists($destination) -or [IO.File]::Exists($destination)) {
             throw "Installation path is already occupied: $destination"
         }
         [IO.Directory]::CreateDirectory($stage) | Out-Null
-        "Installing AIR SDK $version at $destination"
+        Write-AsmHeading ("Install AIR SDK $version")
+        Write-AsmLine ("Destination: $destination") 'Muted'
         Build-Sdk $version $stage
         [IO.Directory]::Move($stage, $destination)
-        "Installed AIR SDK $version at $destination"
+        Write-AsmLine ("Installed AIR SDK $version") 'Accent'
+        Write-AsmLine ("Path: $destination") 'Muted'
     } finally {
         if ([IO.Directory]::Exists($stage)) {
             $safeStage = Get-ChildPath $stage $root
@@ -410,12 +446,11 @@ function Update-Sdks {
         }
     )
     if ($updates.Count) {
-        '{0,-14} {1,-14} {2}' -f 'Installed', 'Available', 'Path'
-        foreach ($update in $updates) {
-            '{0,-14} {1,-14} {2}' -f $update.Sdk.Version, $update.Available, $update.Sdk.Path
-        }
-    } elseif ($sdks.Count) { 'Installed SDKs are up to date.' }
-    else { 'No local AIR SDK versions found.' }
+        Write-AsmHeading 'Available updates'
+        $rows = @(foreach ($update in $updates) { ,@($update.Sdk.Version.ToString(), $update.Available.ToString(), $update.Sdk.Path) })
+        Write-AsmRows $rows @('Installed', 'Available', 'Path')
+    } elseif ($sdks.Count) { Write-AsmLine 'Installed SDKs are up to date.' }
+    else { Write-AsmLine 'No local AIR SDK versions found.' }
     if (-not $filter) {
         $latestRelease = $versions | Sort-Object -Descending | Select-Object -First 1
         $newestInstalled = $sdks | Sort-Object Version -Descending | Select-Object -First 1
@@ -424,13 +459,20 @@ function Update-Sdks {
             $_.Version.Build -eq $latestRelease.Build
         }
         if ($latestRelease -and (-not $newestInstalled -or $latestRelease -gt $newestInstalled.Version) -and -not $installedBranch) {
-            ''
-            "New AIR SDK available: $latestRelease"
-            'Install: asm install {0}.{1}' -f $latestRelease.Major, $latestRelease.Minor
+            Write-AsmLine
+            Write-AsmLine ("New AIR SDK available: $latestRelease") 'Accent'
+            Write-AsmLine ('Install: asm install {0}.{1}' -f $latestRelease.Major, $latestRelease.Minor)
         }
     }
     $apply = ($filter -or $env:ASM_UPDATE_ALL) -and -not $env:ASM_UPDATE_CHECK
-    if (-not $updates.Count -or -not $apply) { return }
+    if (-not $updates.Count -or -not $apply) {
+        if ($updates.Count -and $script:AsmInteractive) {
+            Write-AsmLine
+            $action = if ($filter) { $filter } else { '--all' }
+            Write-AsmWrapped ("Apply: asm update $action") 2 'Accent'
+        }
+        return
+    }
     if (-not $env:ASM_ACCEPT_LICENSE -and (Get-ManagerSetting 'HAS_ACCEPTED_LICENSE') -ne 'true') {
         throw 'Accept the AIR SDK license using --accept-license, or use AIR SDK Manager first.'
     }
@@ -448,9 +490,10 @@ try {
         'search' { Search-Sdks }
         'update' { Update-Sdks }
         'install' { Install-Sdk }
+        'help' { Show-AsmHelp $Topic }
     }
     exit 0
 } catch {
-    [Console]::Error.WriteLine("Error: {0}", $_.Exception.Message)
+    Write-AsmLine ("Error: {0}" -f $_.Exception.Message) -Stderr
     exit 1
 }

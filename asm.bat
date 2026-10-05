@@ -30,21 +30,8 @@ exit /b 1
 
 :help
 if not "%~2"=="" goto unexpected_arguments
-echo asm - AIR SDK Manager
-echo.
-echo Usage: asm COMMAND
-echo.
-echo Commands:
-echo   help [COMMAND]  Show help.
-echo   --version    Show the asm version. Alias: -v.
-echo   list         List SDKs from AIR SDK Manager settings. Alias: ls.
-echo   search [VERSION]  Search available stable AIR SDK versions.
-echo   update [VERSION] [--all] [--check]  Check or apply SDK updates.
-echo   install VERSION  Install a stable branch or a specific SDK build.
-echo.
-echo Options:
-echo   -h, --help   Show help.
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" help
+exit /b %errorlevel%
 
 :version
 if not "%~2"=="" goto unexpected_arguments
@@ -60,13 +47,8 @@ exit /b %errorlevel%
 
 :list_help
 if not "%~3"=="" goto unexpected_arguments
-echo Usage: asm list
-echo Alias: asm ls
-echo.
-echo Reads AIR_SDKS from "%USERPROFILE%\.airsdk\airsdkmanager.cfg".
-echo Lists SDKs in the configured directory's immediate subfolders.
-echo Output: SDK version and its absolute directory.
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" help list
+exit /b %errorlevel%
 
 :search
 if /i "%~2"=="--help" goto search_help
@@ -78,12 +60,8 @@ exit /b %errorlevel%
 
 :search_help
 if not "%~3"=="" goto unexpected_arguments
-echo Usage: asm search [VERSION]
-echo.
-echo Searches stable SDK releases in the official AIR SDK announcement archive.
-echo VERSION can be a branch such as 51.4 or a full build such as 51.4.1.1.
-echo Uses the manager's cached catalog if the release source is unavailable.
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" help search
+exit /b %errorlevel%
 
 
 :update
@@ -117,16 +95,8 @@ exit /b %errorlevel%
 
 :update_help
 if not "%~3"=="" goto unexpected_arguments
-echo Usage: asm update [VERSION] [--all] [--check] [--accept-license]
-echo.
-echo No arguments: show installed SDK updates and a new SDK branch, if available.
-echo --all: update all installed SDKs that have a newer build.
-echo VERSION: update matching installed SDKs. Example: asm update 51.3.
-echo --check: only show updates, including when VERSION or --all is given.
-echo --accept-license: accept the AIR SDK license for this operation.
-echo Updates keep each SDK's three-component version and existing path.
-echo New branches are announced with an asm install command.
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" help update
+exit /b %errorlevel%
 
 
 :install
@@ -153,13 +123,8 @@ exit /b %errorlevel%
 
 :install_help
 if not "%~3"=="" goto unexpected_arguments
-echo Usage: asm install VERSION [--accept-license]
-echo.
-echo VERSION: a branch such as 51.4, a full build such as 51.4.1.1, or latest.
-echo Installs into AIR_SDKS from AIR SDK Manager settings.
-echo An already installed build is kept and reported.
-echo --accept-license: accept the AIR SDK license for this operation.
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" help install
+exit /b %errorlevel%
 
 :unexpected_arguments
 >&2 echo Error: Unexpected arguments. Run asm help.

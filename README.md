@@ -62,6 +62,28 @@ the asm prototype has only been exercised on Windows. The manager uses the
 home directory directly, rather than macOS Application Support or an XDG
 configuration directory. Nonstandard home directories must also work.
 
+## Terminal output
+
+General help includes a compact ASCII banner. Interactive output uses an
+indigo accent (`#818CF8`), aligned version/path columns, and suggestions for the
+next command. Narrow terminals use stacked entries and wrapped paths.
+
+Catalog and manifest requests display a spinner. Downloads use a custom bar
+with transferred bytes, percentage when the total is known, and average speed.
+Unknown-size downloads show activity and bytes without inventing a percentage.
+Hash verification and extraction also display activity. PowerShell's native
+progress display is disabled.
+
+Progress goes to stderr and clears on completion or error. Redirecting either
+output stream disables colors and animation; `TERM=dumb` does the same.
+`NO_COLOR` disables colors while retaining activity in an interactive terminal.
+Redirected search results remain one full version per line, without headings or
+installation suggestions. `--version` always prints only `1.0.0`.
+
+The runtime remains small: `asm.bat` dispatches commands, `sdk.ps1` manages SDKs,
+and `terminal.ps1` handles presentation and HTTP transfers. Keep these files
+together; no external terminal UI library is required.
+
 ## Commands
 
 | Command | Behavior |
@@ -321,33 +343,18 @@ help because other managers assign them different meanings.
 
 ## Current development plan
 
-The next iteration focuses on presentation and installation while preserving
-the existing SDK-management behavior:
+English documentation and terminal text, the ASCII banner, indigo accents,
+aligned layouts, custom progress, and wait indicators are implemented in the
+Windows prototype. The remaining steps in this iteration are:
 
-1. **English throughout.** Documentation, terminal text, code comments, and new
-   repository metadata use English.
-2. **A readable ASCII banner.** Compact branding in general help, aligned in a
-   monospace terminal. Verify normal and narrow widths; keep `--version` minimal.
-3. **A custom download progress bar.** Show transferred bytes, percentage when
-   size is known, and transfer speed. Replace PowerShell's native progress UI.
-4. **An indigo accent.** Highlight branding, versions, key actions, and progress
-   with a restrained purple/indigo palette. Respect `NO_COLOR` and plain output.
-5. **Consistent terminal layout.** Clear spacing, aligned columns, readable
-   headings, and direct next-action suggestions. Avoid decorative output in pipes.
-6. **Visible activity during waits.** Animate a spinner during catalog/manifest
-   requests and other potentially slow operations. Clear it on completion or
-   error; disable animation when output is redirected or the terminal is dumb.
-7. **Platform-aware foundations.** Preserve the manager's home-based settings
-   on Windows, macOS, and Linux. Future installation must select the correct OS
-   archive and perform that platform's SDK configuration steps.
-8. **A small bootstrap installer.** Provide a copy-and-paste PowerShell command
-   for the Windows prototype, with per-user installation and `PATH` setup.
-   Reinstallation must be safe, conflicting commands must be detected, and
-   temporary downloads must be cleaned up. Add a shell `install.sh` when a Unix
-   runtime is ready, rather than offering a Unix command that cannot run asm.
+1. **A small bootstrap installer.** Provide a copy-and-paste PowerShell command
+   with per-user installation and automatic `PATH` setup. Detect an existing
+   unrelated `asm` command and clean installer temporary files.
+2. **Platform-aware foundations.** Preserve the verified home-based manager
+   settings on Windows, macOS, and Linux. A Unix runtime must select the right
+   archive and perform that platform's SDK configuration steps. Add `install.sh`
+   alongside a working macOS/Linux implementation.
 
-Implementation order: terminal output and activity indicators, the Windows
-bootstrap installer, then verification of interactive and redirected output.
 Each feature is committed separately. Development continues on `1.0.0`;
 published releases and tags will be added only once that version is ready.
 
