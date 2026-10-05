@@ -12,6 +12,7 @@ if /i "%~1"=="-v" goto version
 if /i "%~1"=="list" goto list
 if /i "%~1"=="ls" goto list
 if /i "%~1"=="search" goto search
+if /i "%~1"=="update" goto update
 
 >&2 echo Error: Unknown command "%~1". Run asm help.
 exit /b 1
@@ -21,6 +22,7 @@ if "%~2"=="" goto help
 if /i "%~2"=="list" goto list_help
 if /i "%~2"=="ls" goto list_help
 if /i "%~2"=="search" goto search_help
+if /i "%~2"=="update" goto update_help
 >&2 echo Error: Unknown help topic "%~2".
 exit /b 1
 
@@ -35,6 +37,7 @@ echo   help [COMMAND]  Show help.
 echo   --version    Show the asm version. Alias: -v.
 echo   list         List SDKs from AIR SDK Manager settings. Alias: ls.
 echo   search [VERSION]  Search available stable AIR SDK versions.
+echo   update [VERSION] [--all] [--check]  Check or apply SDK updates.
 echo.
 echo Options:
 echo   -h, --help   Show help.
@@ -77,6 +80,48 @@ echo.
 echo Searches stable SDK releases in the official AIR SDK announcement archive.
 echo VERSION can be a branch such as 51.4 or a full build such as 51.4.1.1.
 echo Uses the manager's cached catalog if the release source is unavailable.
+exit /b 0
+
+
+:update
+if /i "%~2"=="--help" goto update_help
+if /i "%~2"=="-h" goto update_help
+set "ASM_UPDATE_VERSION="
+set "ASM_UPDATE_ALL="
+set "ASM_UPDATE_CHECK="
+set "ASM_ACCEPT_LICENSE="
+shift /1
+
+:update_arguments
+if "%~1"=="" goto update_run
+if /i "%~1"=="--all" (
+    set "ASM_UPDATE_ALL=1"
+) else if /i "%~1"=="--check" (
+    set "ASM_UPDATE_CHECK=1"
+) else if /i "%~1"=="--accept-license" (
+    set "ASM_ACCEPT_LICENSE=1"
+) else (
+    if defined ASM_UPDATE_VERSION goto unexpected_arguments
+    set "ASM_UPDATE_VERSION=%~1"
+)
+shift /1
+goto update_arguments
+
+:update_run
+if defined ASM_UPDATE_ALL if defined ASM_UPDATE_VERSION goto unexpected_arguments
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" update
+exit /b %errorlevel%
+
+:update_help
+if not "%~3"=="" goto unexpected_arguments
+echo Usage: asm update [VERSION] [--all] [--check] [--accept-license]
+echo.
+echo No arguments: show available updates without changing SDK files.
+echo --all: update all installed SDKs that have a newer build.
+echo VERSION: update matching installed SDKs. Example: asm update 51.3.
+echo --check: only show updates, including when VERSION or --all is given.
+echo --accept-license: accept the AIR SDK license for this operation.
+echo Updates keep each SDK's three-component version and existing path.
 exit /b 0
 
 :unexpected_arguments
