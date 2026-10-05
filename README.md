@@ -1,18 +1,15 @@
 # asm
 
-CLI-менеджер версий AIR SDK, версия `1.0.0`. Позволяет посмотреть установленные
-SDK, найти доступные версии, установить новую сборку и обновить существующие.
-Несколько SDK могут стоять рядом.
+A command-line version manager for AIR SDK. List installed SDKs, find available
+releases, install a version, and update existing installations.
 
-Первая версия находится в разработке; опубликованного релиза пока нет.
+Version **1.0.0 is in development**. There are no published releases yet.
+The current implementation runs on Windows using a batch launcher and built-in
+Windows PowerShell. macOS and Linux support is planned.
 
-Сейчас это Windows-прототип: `asm.bat` и один `sdk.ps1`, работающий через встроенный
-Windows PowerShell. Кроссплатформенный бинарник для Windows, macOS и Linux —
-следующий этап. Структура остаётся простой, команды добавляются постепенно.
+## Getting started
 
-## Запуск
-
-Из папки проекта в cmd:
+From the project directory in cmd:
 
 ```bat
 asm --version
@@ -22,83 +19,89 @@ asm install 51.4
 asm update
 ```
 
-В PowerShell используйте `./asm.bat`, например `./asm.bat install 51.4`.
-Для вызова из других папок добавьте каталог с `asm.bat` и `sdk.ps1` в `PATH`.
-`asm --version` и `asm -v` выводят строго `1.0.0`.
+In PowerShell, use `./asm.bat`, for example `./asm.bat install 51.4`.
+Until the bootstrap installer is implemented, add the project directory to
+`PATH` to run `asm` from other directories. Keep the launcher and its PowerShell
+files together. `asm --version` and `asm -v` print exactly `1.0.0`.
 
-```text
-asm/
-  asm.bat     команды и справка
-  sdk.ps1     настройки, каталог, установка и обновление
-  README.md   использование, источники и дальнейшие шаги
-```
+## SDK locations and configuration
 
-## Где искать и устанавливать SDK
-
-Каталог берётся из настроек существующего AIR SDK Manager:
-`%USERPROFILE%\.airsdk\airsdkmanager.cfg`.
+asm reads the existing AIR SDK Manager configuration. It does not rewrite the
+manager's settings or database. The SDK directory can be anywhere:
 
 ```ini
 AIR_SDKS=C:\AIRSDK
 HAS_ACCEPTED_LICENSE=true
 ```
 
-`AIR_SDKS` может указывать на любой каталог. Указывать путь при каждом вызове
-не требуется. asm читает конфиг и базу менеджера, не перезаписывая их.
-Поиск SDK через `PATH`, дополнительные корни и собственные настройки пока
-относятся к дальнейшим шагам.
+The Windows implementation reads
+`%USERPROFILE%\.airsdk\airsdkmanager.cfg`. No directory argument is needed for
+each command. SDK discovery through `PATH` and additional saved roots are
+planned.
 
-Для загрузки нужно принятое соглашение AIR SDK: используется
-`HAS_ACCEPTED_LICENSE=true` либо `--accept-license` у `install`/`update`.
-Флаг принимает соглашение только для текущей операции и не изменяет конфиг.
+Downloading requires acceptance of the AIR SDK license: either
+`HAS_ACCEPTED_LICENSE=true` in the manager configuration, or `--accept-license`
+on `install`/`update`. The flag applies to the current operation and does not
+change the configuration.
 
-## Команды
+### Manager configuration on macOS and Linux
 
-| Вызов | Результат |
+The inspected manager code uses `File.userDirectory.resolvePath(".airsdk")`,
+then reads `airsdkmanager.cfg`. Mapping this through the
+[AIR File.userDirectory documentation](https://airsdk.dev/reference/actionscript/3.0/flash/filesystem/File.html#userDirectory)
+gives the following locations:
+
+| Platform | Configuration | Database and SDK directory |
+| --- | --- | --- |
+| Windows | `%USERPROFILE%\.airsdk\airsdkmanager.cfg` | `airsdkmanager.db` beside the configuration; SDK root from `AIR_SDKS`. |
+| macOS | `~/.airsdk/airsdkmanager.cfg`, usually `/Users/<user>/.airsdk/airsdkmanager.cfg` | Same database name and `AIR_SDKS` setting. |
+| Linux | `~/.airsdk/airsdkmanager.cfg`, usually `/home/<user>/.airsdk/airsdkmanager.cfg` | Same database name and `AIR_SDKS` setting. |
+
+These paths are established from the manager code and runtime documentation;
+the asm prototype has only been exercised on Windows. The manager uses the
+home directory directly, rather than macOS Application Support or an XDG
+configuration directory. Nonstandard home directories must also work.
+
+## Commands
+
+| Command | Behavior |
 | --- | --- |
-| `asm help [COMMAND]` | Общая справка или справка по команде. Без аргументов asm также показывает справку. |
-| `asm --version`, `asm -v` | Номер менеджера: `1.0.0`. |
-| `asm list`, `asm ls` | Установленные SDK и их абсолютные пути. |
-| `asm search [VERSION]` | Опубликованные стабильные версии, новые первыми. |
-| `asm install VERSION` | Установка ветки, точной сборки либо `latest`. |
-| `asm update` | Обновления установленных SDK и уведомление о новой доступной ветке. |
-| `asm update VERSION` | Обновление подходящих установленных SDK. |
-| `asm update --all` | Обновление всех установленных SDK, для которых есть новая сборка. |
-| `asm update VERSION --check` | Просмотр обновлений выбранных SDK без изменения файлов. |
-| `asm update --all --check` | Просмотр всех обновлений без изменения файлов. |
+| `asm help [COMMAND]` | Show general or command help. Running `asm` without arguments also shows help. |
+| `asm --version`, `asm -v` | Print only the manager version: `1.0.0`. |
+| `asm list`, `asm ls` | List installed SDK versions and absolute paths. |
+| `asm search [VERSION]` | List announced stable releases, newest first. |
+| `asm install VERSION` | Install a branch, an exact build, or `latest`. |
+| `asm update` | Show updates for installed SDKs and announce a newer uninstalled branch. |
+| `asm update VERSION` | Update matching installed SDKs. |
+| `asm update --all` | Update every installed SDK that has a newer build. |
+| `asm update VERSION --check` | Preview updates for selected SDKs. |
+| `asm update --all --check` | Preview all installed updates and the new-branch notice. |
 
-Работают `asm --help`, `asm -h` и справка после команды:
-`asm install --help`, `asm update -h`, `asm search --help`, `asm list --help`.
-Для `install` номер обязателен; `install --version VERSION`, `--json`, `--quiet`
-и другие не перечисленные здесь параметры пока не реализованы.
+Help is also available through `asm --help`, `asm -h`, and commands such as
+`asm install --help` or `asm update -h`. `install` currently requires a version.
+`install --version VERSION`, `--json`, and other undocumented options are not
+implemented yet.
 
-Ошибки и предупреждения идут в stderr; данные и сообщения о ходе установки —
-в stdout. Код завершения `0` означает успех, `1` — ошибку. Неизвестные команды
-и лишние аргументы завершаются ошибкой.
+Errors and warnings go to stderr. Successful commands return `0`; errors return
+`1`. Unknown commands and unexpected arguments are rejected.
 
-### Список установленных SDK
+### List
 
 ```bat
 asm list
 ```
 
-Проверяются непосредственные подпапки `AIR_SDKS`, как в GUI менеджера.
-Имя папки может быть произвольным: версия читается из `air-sdk-description.xml`.
-`<version>51.3.4</version>` и `<build>3</build>` дают `51.3.4.3`.
-Полный четырёхкомпонентный номер в `<version>` также поддерживается.
+Only immediate subdirectories of `AIR_SDKS` are examined, as in AIR SDK Manager.
+Folder names are arbitrary. Versions come from `air-sdk-description.xml`:
+`<version>51.3.4</version>` and `<build>3</build>` produce `51.3.4.3`.
+A four-component number in `<version>` is also supported.
 
-```text
-50.2.5.1       C:\AIRSDK\AIRSDK_50.2.5
-51.3.3.2       C:\AIRSDK\AIRSDK_51.3.3
-51.3.4.3       C:\AIRSDK\AIRSDK_51.3.4
-```
+Versions are sorted numerically. Directories without a description are skipped;
+invalid descriptions produce a warning. Missing settings, an empty `AIR_SDKS`,
+or a missing SDK root are errors. An existing empty root produces an explanatory
+message and returns `0`.
 
-Версии сортируются численно. Папки без описания пропускаются; повреждённые XML —
-с предупреждением. Отсутствующие настройки, пустой `AIR_SDKS` или несуществующий
-корень дают ошибку. Пустой существующий каталог даёт сообщение об отсутствии SDK
-и код `0`.
-
-### Поиск
+### Search
 
 ```bat
 asm search
@@ -106,22 +109,21 @@ asm search 51.4
 asm search 51.4.1.1
 ```
 
-Короткий номер фильтрует ветку по компонентам: `51.4` не совпадает с `51.40`.
-Полный номер требует точного совпадения. Выводятся только номера сборок,
-от новых к старым. Пустой результат даёт сообщение и код `0`.
+Filters match version components: `51.4` does not match `51.40`. An exact
+four-component filter requires an exact match. Results are full build numbers,
+newest first. No matches produce an explanatory message and return `0`.
 
-Основной источник — официальный архив анонсов AIR SDK. Он включает свежие
-релизы, но некоторые старые сборки без анонса могут отсутствовать. Beta, alpha
-и preview исключаются по заголовкам; известные previews `51.0.0.2` и `51.0.0.4`,
-подписанные в архиве как Release, исключены отдельно.
+The announcement archive includes fresh releases but may omit older builds
+without individual announcements. Beta, alpha, and preview entries are excluded
+by title. Known previews `51.0.0.2` and `51.0.0.4`, titled as releases, are
+excluded explicitly.
 
-Если источник недоступен, читается `airsdkmanager.db` или свежая
-`airsdkmanager.db.backup*` в папке настроек менеджера. Предупреждение указывает
-путь к использованной базе; данные могут быть устаревшими. Если рабочего
-каталога нет, команда возвращает ошибку. Это небольшая база GUI менеджера;
-скачанные ZIP asm в ней не хранит.
+When the source fails, asm reads `airsdkmanager.db`, then
+`airsdkmanager.db.backup*` from newest to oldest. A warning identifies the
+database used; its contents may be stale. Failure to obtain any usable catalog
+is an error. This existing GUI database is separate from SDK archives.
 
-### Установка
+### Install
 
 ```bat
 asm install 51.4
@@ -130,19 +132,19 @@ asm install latest
 asm install 51.4 --accept-license
 ```
 
-`51`, `51.4` и `51.4.1` выбирают максимальную подходящую стабильную сборку
-каталога; `latest` — последнюю стабильную версию. Сравниваются четыре числовых
-компонента. Полный номер запрашивается напрямую у источника загрузки, поэтому
-можно установить сборку без отдельного анонса. Если точной сборки у источника
-нет, подмена другой версией не выполняется.
+`51`, `51.4`, and `51.4.1` resolve to the newest matching stable build;
+`latest` resolves to the newest stable version. All four components are compared
+numerically. An exact version queries the download source directly, allowing
+installation of builds without an announcement. An unavailable version causes
+an error instead of selecting a different build.
 
-Для `51.4.1.1` создаётся `AIR_SDKS\AIRSDK_51.4.1.1`. Отсутствующий корень
-создаётся автоматически. Уже установленная сборка определяется по описанию,
-даже в папке с произвольным именем: повторный вызов показывает её путь и
-завершается без переустановки. Занятая целевая папка с другими файлами вызывает
-ошибку. Установка не переключает активный SDK и не меняет `PATH`.
+Version `51.4.1.1` installs into `AIR_SDKS\AIRSDK_51.4.1.1`. A missing root is
+created. An existing matching version is detected by its description, regardless
+of the directory name, and is reported without reinstalling it. An occupied
+destination containing other files is rejected. Installation does not change
+the selected SDK or `PATH`.
 
-### Обновление
+### Update
 
 ```bat
 asm update
@@ -153,14 +155,9 @@ asm update --all
 asm update --all --accept-license
 ```
 
-Без аргументов показываются текущая версия, доступная версия и путь. `--all`
-применяет обновления; позиционный номер выбирает существующие установки по
-префиксу. Полный номер выбирает текущую установку, а не целевую сборку.
-`--check` работает до или после номера и оставляет только просмотр.
-Позиционный номер и `--all` несовместимы.
-
-Общий обзор также сообщает о последней стабильной версии, если она новее всех
-установленных SDK и относится к ещё не установленной ветке. Например:
+Without arguments, asm shows installed versions, available updates, and paths.
+It also announces the newest stable release if it is newer than every installed
+SDK and its three-component version is not installed:
 
 ```text
 Installed SDKs are up to date.
@@ -169,202 +166,228 @@ New AIR SDK available: 51.4.1.1
 Install: asm install 51.4
 ```
 
-Это уведомление работает в `update`, `update --check`, `update --all` и
-`update --all --check`. `--all` обновляет существующие установки; новую ветку
-устанавливают отдельно подсказанной командой. После её установки уведомление
-исчезает. При пустом каталоге SDK общий обзор предлагает последнюю стабильную
-версию. При указанном номере обзор ограничивается выбранными установками.
+The notice also appears with `--check`, `--all`, and `--all --check`. It disappears
+once that branch is installed. An empty SDK root receives a suggestion to
+install the newest stable version. A positional filter restricts the overview
+to matching installed SDKs.
 
-Как AIR SDK Manager, обновляем только последний компонент:
-`51.3.4.1` → `51.3.4.3`. Установленные `51.3.3` и `51.3.4` остаются отдельными
-SDK. Новая ветка ставится через `install`. Версии сравниваются численно.
+`--all` applies updates to existing installations. A version selects installed
+SDKs by prefix; a full number selects the current installation, not the target
+build. `--check` can appear before or after the number. A number and `--all`
+cannot be combined.
 
-Сохраняются путь SDK, `lib/adt.cfg` и `lib/adt.lic`; существующий `PATH` продолжает
-работать. Если выбранного SDK нет, команда сообщает об ошибке и предлагает
-`asm list`. Если обновлений нет, выводится пояснение и возвращается `0`.
-В `--all` установки обрабатываются последовательно. После ошибки дальнейшие
-SDK не обновляются; уже успешно завершённые обновления сохраняются.
+As in AIR SDK Manager, an update changes only the fourth component:
+`51.3.4.1` to `51.3.4.3`. Installed `51.3.3` and `51.3.4` remain separate SDKs.
+New branches are installed with `install`. The SDK path, `lib/adt.cfg`, and
+`lib/adt.lic` are preserved, keeping existing tool paths valid.
 
-## Скачивание, проверка и очистка
+No matching installation is an error with an `asm list` suggestion. No available
+update is a successful result. `--all` processes SDKs sequentially and stops at
+the first error; completed updates remain installed.
 
-`install` и `update` используют общую сборку SDK. По умолчанию скачивается
-полный Windows ZIP с компилятором через каталог shockpkg и зеркало archive.org.
-При явно заданном `API_ENDPOINT` используется точный манифест из базы менеджера
-или этого API. В компонентном рецепте исключаются `linux` и `macos`; общие
-инструменты, Windows, Android и iPhone остаются для сборки с Windows.
+## Downloads and cleanup
 
-Новые файлы собираются во временной папке внутри `AIR_SDKS`. Проверяются размер
-загрузки, SHA-256, пути ZIP и наличие `bin\adt.bat`/`lib\adt.jar`. Создаётся
-совместимый с менеджером `air-sdk-description.xml`. Готовая папка появляется
-только после проверок; существующий SDK не меняется при сбое скачивания
-или распаковки.
+`install` and `update` share SDK assembly logic. By default, asm downloads the
+full Windows archive with the compiler using shockpkg metadata and archive.org.
+An explicit `API_ENDPOINT` enables that API's manifest or an exact manifest
+from the manager database. Windows component recipes exclude `linux` and
+`macos`, retaining common tools, Windows, Android, and iPhone components.
 
-ZIP удаляется после распаковки. Временные папки, незавершённые загрузки и файл
-блокировки удаляются при завершении операции. При обновлении старую папку SDK
-временно переименовываем для отката; после успешной замены удаляем. Постоянных
-бэкапов и кеша архивов нет, отдельные `.asm-backups` и `asm-cache` не создаются.
-Если замену не удалось выполнить, возвращаем старый SDK на место. Если и откат
-не удался, сохраняем исходные файлы и сообщаем их путь в ошибке.
+Files are assembled in a temporary directory inside `AIR_SDKS`. Download size,
+SHA-256, ZIP paths, `bin\adt.bat`, and `lib\adt.jar` are checked. A compatible
+`air-sdk-description.xml` is generated before the installation is moved into
+place. Download or extraction failures leave existing SDKs untouched.
 
-Установка и обновление используют одну файловую блокировку. Второй одновременный
-запуск, меняющий SDK в том же корне, завершается ошибкой. Лимит сетевого запроса
-каталога или манифеста — 15 секунд, загрузки большого ZIP — 600 секунд.
+Archives are deleted after extraction. Temporary directories, incomplete
+downloads, and the operation lock are removed on completion. An update
+temporarily renames the old SDK for rollback and deletes it after a successful
+replacement. Persistent `.asm-backups` and archive caches are not created.
+If rollback itself fails, the original files are retained and their location is
+included in the error.
 
-## Источники и альтернативы
+Install and update share a lock for the SDK root. Another concurrent writer
+fails instead of changing the same SDKs. Catalog and manifest requests have a
+15-second timeout; a large archive download has a 600-second timeout.
 
-Состояние сетевых проверок ниже зафиксировано **5 октября 2026 года**.
-Доступность серверов может измениться; измерения не являются гарантией скорости.
-Эти сведения сохранены для смены источника и дальнейшей разработки.
+## Sources and fallback options
 
-### Каталог доступных версий
+The network findings below were recorded on **October 5, 2026**. Availability
+can change, and measured request times are not speed guarantees. These notes
+are retained for switching sources or revisiting an alternative.
 
-| Источник | Использование и ограничения |
+### Version catalogs
+
+| Source | Use and limitations |
 | --- | --- |
-| [Архив анонсов airsdk.dev](https://airsdk.dev/news/archive) | Текущий источник `search`, разрешения коротких номеров и проверки `update`. Около 18 КБ и 1 секунды в пробном запросе. На дату проверки свежий релиз — `51.4.1.1` от 23 сентября 2026. Тихие сборки без анонса могут отсутствовать. |
-| [Основной API HARMAN](https://api.airsdk.harman.com/releases?types=production) | Родной источник GUI: JSON с массивом `releases` и типами сборок. Проба вернула HTTP 200 с `Sandbox.Timedout` примерно через 10 секунд; HTTP 200 нужно проверять по содержимому. VPN не устранил серверную ошибку. Можно вернуться после восстановления сервиса. |
-| База AIR SDK Manager | Текущий резервный источник при сетевой ошибке: `availableSDKs`, `latestSDKs`, `installableSDKs`, поле `build`. Используется основной `.db`, затем резервные копии от свежих к старым. Это локальный снимок, актуальность не гарантируется. |
-| [RSS](https://airsdk.dev/news/rss.xml) и [Atom](https://airsdk.dev/news/atom.xml) | Рассмотрены как альтернативный формат анонсов; обычно охватывают недавние публикации, а не весь исторический каталог. Пока автоматически не используются. |
-| [Исходники новостей airsdk.dev](https://github.com/airsdk/airsdk.dev/tree/main/news) | Альтернатива парсингу HTML: опубликованные новости в репозитории сайта. Нужно учитывать лимиты GitHub API; тихие сборки здесь тоже могут отсутствовать. Пока не используются. |
-| [Каталог shockpkg](https://shockpkg.github.io/packages/api/1/packages.json) | Содержит больше архивов, включая сборки без отдельных анонсов. Около 3,9 МБ в проверенном снимке. Поля production/prerelease нет, поэтому для коротких номеров нужен отдельный источник стабильности. Используется для загрузок, не как основной список стабильных версий. |
+| [AIR SDK announcement archive](https://airsdk.dev/news/archive) | Current source for search, short-version resolution, and update checks. About 18 KB and one second in a probe. Newest release at the time was `51.4.1.1`, announced September 23, 2026. Unannounced builds may be absent. |
+| [HARMAN API](https://api.airsdk.harman.com/releases?types=production) | GUI's native catalog: a `releases` array with release types. A probe returned HTTP 200 containing `Sandbox.Timedout` after roughly ten seconds; a VPN did not fix the server error. Validate JSON, not only HTTP status. A future primary source once healthy. |
+| AIR SDK Manager database | Current fallback: `availableSDKs`, `latestSDKs`, and `installableSDKs`, each containing `build` metadata. Main database first, then newest usable backups. An existing local snapshot, not a guarantee of freshness. |
+| [RSS](https://airsdk.dev/news/rss.xml) and [Atom](https://airsdk.dev/news/atom.xml) | Investigated alternatives to HTML parsing, generally covering recent announcements rather than a complete history. Not used automatically. |
+| [News source repository](https://github.com/airsdk/airsdk.dev/tree/main/news) | Another way to obtain published announcements. GitHub API rate limits apply; unannounced builds remain absent. Not currently used. |
+| [shockpkg catalog](https://shockpkg.github.io/packages/api/1/packages.json) | More archives, including unannounced builds; approximately 3.9 MB in the inspected snapshot. No production/prerelease classification, so stable short-version resolution needs another source. Used for downloads. |
 
-Явное поле `API_ENDPOINT` в `airsdkmanager.cfg` переключает каталог на
-`GET <API_ENDPOINT>/releases?types=production`. Пока это единственный переключатель
-сетевого источника; отдельного параметра `--source` нет. Ответ должен содержать
-массив `releases`; элементы с типом, отличным от `production`, пропускаются.
-При ошибке этого API сохраняется резервный переход к базе GUI менеджера.
+An explicit `API_ENDPOINT` in the manager configuration switches catalog
+requests to `GET <API_ENDPOINT>/releases?types=production`. Entries explicitly
+typed as non-production are excluded. On failure, the manager database remains
+the fallback. There is no `--source` command option yet.
 
-### Источники загрузки SDK
+### SDK download sources
 
-| Источник | Использование и результат проверки |
+| Source | Use and findings |
 | --- | --- |
-| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Текущий путь по умолчанию. Выбирается `air-sdk-<full-version>-windows-compiler`; `source`, `sha256`, `size` используются для загрузки и проверки. В каталоге также есть варианты для macOS/Linux. Для Windows ZIP `51.3.4.3` пробное чтение первых 32 байт вернуло HTTP 206 и ZIP-сигнатуру за 1,8 секунды. SHA-256 берётся из каталога shockpkg. |
-| Компоненты API HARMAN | Родной протокол менеджера: `POST /releases/components/<name>/<component-version>`, form body `acceptedLicense=true`. В пробах загрузка вернула 403. Для явно указанного `API_ENDPOINT` этот путь поддерживается, если точный манифест содержит `components`. |
-| Полный Windows ZIP HARMAN | Запасной рецепт при отсутствии компонентов: `urls.AIR_Win` с `url`, `checksum`, `fileSize`. Относительный URL дополняется `https://airsdk.harman.com`; для этого сайта добавляется `license=accepted`. Прямой пробный запрос официального ZIP вернул 403. |
-| [Старый API сайта HARMAN](https://airsdk.harman.com/download) | Рассмотрены `/api/versions/release-notes`, `/api/config-settings/download`, `/api/versions/<full-version>`. Пробы не уложились в 15 секунд, в том числе с браузерными заголовками. Возможная будущая альтернатива после повторной проверки. |
+| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON catalog](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Default recipe: `air-sdk-<full-version>-windows-compiler`, using `source`, `sha256`, and `size`. Other platforms are also listed. A 32-byte probe of Windows SDK `51.3.4.3` returned HTTP 206 and a ZIP signature in 1.8 seconds. Hashes come from shockpkg. |
+| HARMAN components | Native manager recipe: `POST /releases/components/<name>/<component-version>` with form data `acceptedLicense=true`. Probes returned 403. Supported for an explicit endpoint with component metadata. |
+| HARMAN full archives | Fallback recipe: `urls.AIR_Win` with `url`, `checksum`, and `fileSize`. Relative URLs use `https://airsdk.harman.com`; that site's URLs receive `license=accepted`. A direct probe returned 403. |
+| [HARMAN website API](https://airsdk.harman.com/download) | Investigated `/api/versions/release-notes`, `/api/config-settings/download`, and `/api/versions/<full-version>`. Probes exceeded 15 seconds, including requests with browser headers. Worth checking again if service availability changes. |
 
-Запросы `/releases/<full-version>` и `/releases/versions/<version>` основного API
-в пробах возвращали 502. `/releases/<full-version>/urls` ответил быстро, но
-содержал строковые URL без контрольных сумм; этого недостаточно для текущего
-проверяемого рецепта установки. `/releases/recent/30` также вернул 502.
+`/releases/<full-version>`, `/releases/versions/<version>`, and
+`/releases/recent/30` returned 502 during probes. `/releases/<full-version>/urls`
+responded quickly but provided string URLs without hashes, insufficient for
+the current verified installation recipe.
 
-После восстановления официального API можно добавить его как основной источник
-каталога и загрузок. До переключения нужно проверить JSON, тип production,
-точный манифест и реальную загрузку Windows компонентов. Текущий mirror-рецепт
-остаётся независимым вариантом. Собственный сервер пакетов пока не требуется.
+Before switching back to the official API, verify the catalog, production
+classification, exact manifest, and an actual Windows component download.
+The mirror recipe remains an independent option. No private package server is
+required.
 
-## Как изучали AIR SDK Manager
+## Researching AIR SDK Manager
 
-Для разработки CLI взяли с GitHub **Linux amd64 сборку AIR SDK Manager 1.4.0** —
-`AIRSDKManager_linux_amd64_1.4.0.zip` из
-[официальных релизов](https://github.com/airsdk/airsdkmanager-releases/releases).
-Архив извлекли и изучили декомпилированный ActionScript-код приложения, чтобы
-повторить существующие настройки, протокол и сборку SDK в CLI.
+The CLI was developed after inspecting the **Linux amd64 build of AIR SDK
+Manager 1.4.0**, `AIRSDKManager_linux_amd64_1.4.0.zip`, obtained from the
+[official GitHub releases](https://github.com/airsdk/airsdkmanager-releases/releases).
+The archive was extracted and its decompiled ActionScript inspected to
+understand the existing settings, download protocol, and SDK assembly process.
 
-Основные изученные классы: `AIRSDKAPI`, `AIRSDKBuild`, `AIRSDKDescription`,
-`AIRSDKDownloadProcess`, `AIRSDKAssembleProcess` и `CreateSDKDescriptionProcess`.
-По ним подтверждены:
+The main references were `AIRSDKAPI`, `AIRSDKBuild`, `AIRSDKDescription`,
+`AIRSDKDownloadProcess`, `AIRSDKAssembleProcess`, and
+`CreateSDKDescriptionProcess`. They established the following:
 
-- Настройки `.airsdk/airsdkmanager.cfg`, ключ `AIR_SDKS`, чтение SDK по описанию.
-- База API `https://api.airsdk.harman.com`, каталог `/releases`, отдельная сборка
-  `/releases/<full-version>` и версия `/releases/versions/<version>`.
-- Манифест `build.components`: имя компонента, его собственная `version`,
-  `checksum` SHA-256 и `fileSize`. Номер компонента может отличаться от номера SDK.
-- POST загрузки с `acceptedLicense=true`, последовательная распаковка
-  компонентов в общую папку и запасной рецепт полного ZIP из `urls`.
-- Совместимый XML: `air-sdk-description`, `name`, трёхкомпонентная `version`
-  и отдельный `build`.
-- Обновление последнего компонента номера SDK с сохранением существующего пути.
+- Settings under `.airsdk`, `AIR_SDKS`, and discovery through SDK descriptions.
+- API base `https://api.airsdk.harman.com`, `/releases`,
+  `/releases/<full-version>`, and `/releases/versions/<version>`.
+- `build.components` with independent component versions, SHA-256 `checksum`,
+  and `fileSize`; component numbers need not match the SDK number.
+- License-accepting POST downloads, sequential assembly into one directory,
+  and full-archive recipes from `urls`.
+- XML with `air-sdk-description`, `name`, a three-component `version`, and `build`.
+- Updating the build component while preserving an installation's path.
 
-В исследованном манифесте `51.4.1.1` были `linux`, `core-tools`, `iphone`,
-`air-tools`, `macos`, `window`, `android`. В Windows-прототипе используются
-компоненты, подходящие для Windows. GUI также сохраняет ZIP-компоненты в кеше;
-в asm архивы удаляются после распаковки. Для будущих macOS/Linux нужно отдельно
-повторить платформенные действия GUI: настройку Linux, права запуска и обработку
-карантина macOS. Бинарник менеджера и его декомпиляция не входят в репозиторий asm.
+The inspected `51.4.1.1` manifest contained `linux`, `core-tools`, `iphone`,
+`air-tools`, `macos`, `window`, and `android`. The GUI caches component archives;
+asm removes them after extraction. Future Unix support must also implement
+platform steps such as Linux configuration, executable permissions, and macOS
+quarantine handling. Manager binaries and decompilation are excluded from this
+repository.
 
-## Похожие проекты
+## Related projects and command naming
 
-| Проект | Для чего полезен |
+| Project | Relevance |
 | --- | --- |
-| [AIR SDK Manager](https://github.com/airsdk/airsdkmanager-releases) | GUI для установки SDK, связанных инструментов, лицензии и настроек. Основной ориентир поведения и источник изученного протокола. |
-| [shockpkg CLI](https://github.com/shockpkg/cli) | Ближайший найденный пакетный CLI для Flash/AIR. Установка через `npm install -g @shockpkg/cli`; команды `install`, `installed`, `remove`, `verify`. `update` обновляет каталог, `upgrade` — установленные пакеты. Можно использовать отдельно вместо asm. |
-| [AIR Package Manager — APM](https://github.com/airsdk/apm) | Управление зависимостями приложений: SWC, ANE и дескриптором приложения. Возможный будущий сопутствующий инструмент. |
-| [setup-adobe-air-action](https://github.com/joshtynjala/setup-adobe-air-action) | Пример установки SDK для GitHub Actions: точные и сокращённые версии, принятие соглашения, `AIR_HOME` и `PATH`. Полезен для CI и будущего `exec`. |
+| [AIR SDK Manager](https://github.com/airsdk/airsdkmanager-releases) | GUI for SDKs, related tools, licenses, and configuration; reference for the inspected protocol. |
+| [shockpkg CLI](https://github.com/shockpkg/cli) | Closest discovered package CLI for Flash/AIR. Installed with `npm install -g @shockpkg/cli`; supports install, installed, remove, and verify. Its `update` refreshes the catalog; `upgrade` updates packages. |
+| [AIR Package Manager](https://github.com/airsdk/apm) | SWC/ANE dependencies and application descriptors; potential companion tool. |
+| [setup-adobe-air-action](https://github.com/joshtynjala/setup-adobe-air-action) | CI example for exact/short versions, license acceptance, `AIR_HOME`, and `PATH`. |
 
-В проведённом поиске отдельный CLI со всем набором короткой установки
-`install 51.4`, выбора SDK для проекта и пользовательской версии по умолчанию
-не найден. Это результат поиска, а не утверждение, что подобных проектов нет.
+The search did not find a dedicated AIR CLI combining short-version install,
+project SDK selection, and a user default. This is a search finding, not a
+claim that no such tool exists.
 
-### Сравнение интерфейса с пакетными менеджерами
+**The command name `asm` is already used by unrelated projects**, including
+[Agent Skill Manager](https://github.com/luongnv89/asm) and
+[Assemble](https://getassemble.dev/docs/cli). It is not a globally unique name.
+The planned installer must detect conflicting commands before adding asm to
+`PATH` and avoid overwriting or silently shadowing another tool.
 
-| Действие | [apt](https://manpages.debian.org/trixie/apt/apt.8.en.html) | [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) | [Chocolatey](https://docs.chocolatey.org/en-us/choco/commands/) | asm |
+### Package-manager conventions
+
+| Operation | [apt](https://manpages.debian.org/trixie/apt/apt.8.en.html) | [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) | [Chocolatey](https://docs.chocolatey.org/en-us/choco/commands/) | asm |
 | --- | --- | --- | --- | --- |
-| Установка | `install` | `install` | `install` | `install VERSION` |
-| Поиск | `search` | `search` | `search` | `search [VERSION]` |
-| Установленные | `list --installed` | `list` | `list` | `list`, `ls` |
-| Обновление установленных | `upgrade` | `upgrade`, alias `update` | `upgrade` | `update` |
-| Обновление каталога | `update` | `source update` | Отдельной команды `update` в списке нет | Автоматически перед поиском и проверкой обновлений |
-| Удаление | `remove` | `uninstall` | `uninstall` | Планируется `uninstall`, alias `remove` |
-| Сведения | `show` | `show` | `info` | Планируется `show`, alias `info` |
+| Install | `install` | `install` | `install` | `install VERSION` |
+| Search | `search` | `search` | `search` | `search [VERSION]` |
+| Installed | `list --installed` | `list` | `list` | `list`, `ls` |
+| Update installed | `upgrade` | `upgrade`, alias `update` | `upgrade` | `update` |
+| Refresh catalog | `update` | `source update` | No separate `update` command listed | Automatic before search and update checks |
+| Remove | `remove` | `uninstall` | `uninstall` | Planned `uninstall`, alias `remove` |
+| Details | `show` | `show` | `info` | Planned `show`, alias `info` |
 
-Название `update` выбрано для обновления SDK. Просмотр без аргументов и
-применение через `--all` похожи на
-[winget upgrade](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade).
-У apt `update` означает обновление каталога. В asm управляем одним продуктом,
-поэтому вместо имени пакета указываем номер AIR SDK.
+The chosen SDK-update name is `update`. Its default preview and `--all` behavior
+resemble [winget upgrade](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade).
+asm manages one product, so a version replaces the usual package name.
+[winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/install)
+and [Chocolatey](https://docs.chocolatey.org/en-us/choco/commands/install/)
+use `--version` for an exact package version; apt uses `PKG=VERSION`. Short AIR
+version resolution is an asm-specific rule. New short flags need unambiguous
+help because other managers assign them different meanings.
 
-У [winget install](https://learn.microsoft.com/en-us/windows/package-manager/winget/install)
-и [choco install](https://docs.chocolatey.org/en-us/choco/commands/install/) точную
-версию задают через `--version`, у apt — `install PKG=VERSION`. Здесь основная
-форма — `asm install VERSION`; разрешение короткого номера в последнюю сборку
-ветки является правилом asm. Короткие флаги у пакетных менеджеров имеют разные
-значения, поэтому добавлять их будем только с однозначной справкой.
+## Current development plan
 
-## Дальнейшие шаги
+The next iteration focuses on presentation and installation while preserving
+the existing SDK-management behavior:
 
-Windows-прототип со справкой, списком, поиском, установкой и обновлением уже
-реализован. Следующие возможности пока являются планом:
+1. **English throughout.** Documentation, terminal text, code comments, and new
+   repository metadata use English.
+2. **A readable ASCII banner.** Compact branding in general help, aligned in a
+   monospace terminal. Verify normal and narrow widths; keep `--version` minimal.
+3. **A custom download progress bar.** Show transferred bytes, percentage when
+   size is known, and transfer speed. Replace PowerShell's native progress UI.
+4. **An indigo accent.** Highlight branding, versions, key actions, and progress
+   with a restrained purple/indigo palette. Respect `NO_COLOR` and plain output.
+5. **Consistent terminal layout.** Clear spacing, aligned columns, readable
+   headings, and direct next-action suggestions. Avoid decorative output in pipes.
+6. **Visible activity during waits.** Animate a spinner during catalog/manifest
+   requests and other potentially slow operations. Clear it on completion or
+   error; disable animation when output is redirected or the terminal is dumb.
+7. **Platform-aware foundations.** Preserve the manager's home-based settings
+   on Windows, macOS, and Linux. Future installation must select the correct OS
+   archive and perform that platform's SDK configuration steps.
+8. **A small bootstrap installer.** Provide a copy-and-paste PowerShell command
+   for the Windows prototype, with per-user installation and `PATH` setup.
+   Reinstallation must be safe, conflicting commands must be detected, and
+   temporary downloads must be cleaned up. Add a shell `install.sh` when a Unix
+   runtime is ready, rather than offering a Unix command that cannot run asm.
 
-| Возможность | Предполагаемое поведение |
+Implementation order: terminal output and activity indicators, the Windows
+bootstrap installer, then verification of interactive and redirected output.
+Each feature is committed separately. Development continues on `1.0.0`;
+published releases and tags will be added only once that version is ready.
+
+### Later capabilities
+
+| Capability | Intended behavior |
 | --- | --- |
-| `show [VERSION]`, `info` | Дата, размер, платформа и источник SDK. |
-| `uninstall VERSION`, `remove` | Удаление конкретной установленной сборки по полному номеру и проверенному пути. |
-| `path [VERSION]` | Путь к установленному или выбранному SDK для IDE и скриптов. |
-| `use VERSION` | Сохранение точного номера в `.asm-version` проекта. |
-| `use --global VERSION`, `current` | Пользовательская версия по умолчанию и вывод эффективного выбора. Место хранения настройки ещё предстоит определить. |
-| `exec [--sdk VERSION] -- TOOL [ARGS...]` | Запуск с `AIR_HOME` и `bin` выбранного SDK в окружении дочернего процесса; сохранение аргументов и кода завершения. |
-| `install` без номера | Установка точного номера из ближайшего `.asm-version`. |
+| `show [VERSION]`, `info` | Display date, size, platform, and source. |
+| `uninstall VERSION`, `remove` | Remove an exact installed build using a verified path. |
+| `path [VERSION]` | Print an installed or selected SDK path for IDEs and scripts. |
+| `use VERSION` | Save an exact build in the project's `.asm-version`. |
+| `use --global VERSION`, `current` | A user default and effective selection; storage location remains undecided. |
+| `exec [--sdk VERSION] -- TOOL [ARGS...]` | Run with the selected `AIR_HOME` and SDK `bin` in the child's environment, preserving arguments and exit status. |
+| `install` without a version | Install the exact build from the nearest `.asm-version`. |
 
-Порядок выбора для будущего запуска: `exec --sdk` → ближайший `.asm-version`
-от текущей папки вверх → пользовательская настройка. Короткие номера в `use`
-разрешаются только среди установленных SDK; в настройку записывается полный
-номер. Отсутствующая выбранная версия даёт ошибку. Сам CLI не меняет окружение
-родительского терминала; интеграция оболочек или shims потребует отдельного шага.
+Future selection order: `exec --sdk`, then the nearest project `.asm-version`,
+then the user default. Resolve short selections from installed SDKs and store
+the full number. A missing selected SDK is an error. Parent-shell environment
+changes need separate shell integration or shims.
 
-После базовых команд: сохранённые дополнительные корни и поиск существующих SDK
-через переменные окружения; JSON для скриптов; подробный и тихий вывод;
-возобновление загрузок и ограниченные повторы сетевых запросов. Flex overlay,
-старые Adobe SDK, `doctor`, дополнения оболочек и работа с APM — поздние дополнения.
-Принятие соглашения остаётся отдельным параметром.
+Additional roots, environment discovery, JSON output, resumable downloads, and
+limited retries follow the basic commands. Flex overlays, older Adobe SDKs,
+`doctor`, completion, and APM integration are later additions. License acceptance
+remains explicit.
 
-Для кроссплатформенной версии язык ещё не выбран. Предложение — Go:
-отдельный исполняемый файл и HTTP/ZIP в стандартной библиотеке. Rust — альтернатива.
-Скорость сравнивать на реальной загрузке и распаковке; без замеров преимущество
-одного языка не обещаем. Для Go достаточно `main.go`, `sdk.go`, `go.mod`
-и этого README. Дополнительные слои вводятся по мере необходимости.
+The cross-platform implementation language is not fixed. Go is a candidate
+for a standalone binary with standard HTTP/ZIP support; Rust is an alternative.
+Measure real downloads and extraction before making speed claims. Keep the
+implementation small, adding layers only when a concrete feature needs them.
+macOS/Linux SDK archives and setup must be exercised on each supported target;
+shipping an asm binary does not imply SDK availability for every architecture.
+[Linux ARM installation documentation](https://airsdk.dev/docs/basics/install/linux)
+is a starting point.
 
-Перед выпуском для macOS/Linux нужно проверить подходящие архивы и действия
-установки на каждой ОС. Наличие бинарника asm само по себе не гарантирует SDK
-для конкретной архитектуры. Для Linux ARM отправная точка —
-[официальная инструкция](https://airsdk.dev/docs/basics/install/linux).
+## Validation
 
-## Проверки
-
-При разработке использовались небольшие SDK и ZIP-фикстуры, отдельный профиль
-менеджера и локальный HTTP-сервер. Проверены разрешение версий, повторная
-установка, кириллица и специальные символы в путях, лицензия, числовая сортировка,
-ошибки API, SHA-256 и размера, выход ZIP за каталог, структура SDK, блокировка,
-конфликт целевой папки, очистка после успеха и ошибки, откат при сбое замены,
-сохранение `adt.cfg`/`adt.lic` и остановка `update --all` после ошибки.
-Полную загрузку SDK и запуск инструментов на каждой целевой ОС нужно проверять
-отдельно перед кроссплатформенным выпуском.
+Development checks use small SDK/ZIP fixtures, an isolated manager profile, and
+a local HTTP server. Existing checks covered numeric versions, idempotent
+installation, paths with spaces and Unicode, licenses, catalog errors, hashes,
+sizes, ZIP traversal, SDK structure, locking, destination races, cleanup,
+rollback, configuration/license preservation, partial `--all` failure, and
+new-branch notifications. Complete SDK downloads and tools need separate
+validation on each platform before a cross-platform release.
