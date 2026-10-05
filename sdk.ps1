@@ -1,6 +1,7 @@
-param([ValidateSet('list', 'search', 'update')][string]$Command = 'list')
+param([ValidateSet('list', 'search', 'update', 'install')][string]$Command = 'list')
 
 $ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $configFile = Join-Path $env:USERPROFILE '.airsdk\airsdkmanager.cfg'
 
 function Get-ManagerSetting([string]$Name) {
@@ -39,12 +40,17 @@ function Read-Sdk([IO.DirectoryInfo]$Directory) {
     }
 }
 
-function Get-InstalledSdks {
+function Get-SdkDirectory {
     if (-not [IO.File]::Exists($configFile)) {
         throw "AIR SDK Manager settings not found: $configFile"
     }
     $sdkDirectory = Get-ManagerSetting 'AIR_SDKS'
     if (-not $sdkDirectory) { throw "AIR_SDKS is not set in $configFile" }
+    [IO.Path]::GetFullPath($sdkDirectory)
+}
+
+function Get-InstalledSdks {
+    $sdkDirectory = Get-SdkDirectory
     if (-not [IO.Directory]::Exists($sdkDirectory)) {
         throw "SDK directory does not exist: $sdkDirectory"
     }
@@ -118,7 +124,6 @@ function Get-NewsVersions {
 function Get-ReleaseVersions {
     $endpoint = Get-ManagerSetting 'API_ENDPOINT'
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
         if ($endpoint) {
             $uri = $endpoint.TrimEnd('/') + '/releases?types=production'
             $response = Invoke-RestMethod -Uri $uri -Method Get -TimeoutSec 15 -UserAgent 'asm/1.0.0'
@@ -255,8 +260,42 @@ function Expand-SdkArchive([string]$File, [string]$Destination) {
     } finally { $archive.Dispose() }
 }
 
+function Build-Sdk([version]$Version, [string]$Destination) {
+    $manifest = Get-SdkManifest $Version
+    $components = @($manifest.components.PSObject.Properties | Where-Object { $_ -and $_.Name -notin @('linux', 'macos') })
+    $endpoint = Get-ManagerSetting 'API_ENDPOINT'
+    if (-not $endpoint) { $endpoint = 'https://api.airsdk.harman.com' }
+    if ($components.Count) {
+        foreach ($component in $components) {
+            $details = $component.Value
+            if (-not $details.version) { throw "Missing component version: $($component.Name)" }
+            $url = $endpoint.TrimEnd('/') + '/releases/components/' + [uri]::EscapeDataString($component.Name) + '/' + [uri]::EscapeDataString($details.version)
+            $archive = Get-SdkArchive $url $details.checksum $details.fileSize $component.Name 'Post'
+            Expand-SdkArchive $archive $Destination
+        }
+    } else {
+        $details = $manifest.urls.AIR_Win
+        if (-not $details.url) { throw "No Windows archive in manifest for $Version." }
+        $url = $details.url
+        if ($url.StartsWith('/')) { $url = 'https://airsdk.harman.com' + $url }
+        if ($url.StartsWith('https://airsdk.harman.com/')) {
+            $separator = if ($url.Contains('?')) { '&' } else { '?' }
+            $url += $separator + 'license=accepted'
+        }
+        $archive = Get-SdkArchive $url $details.checksum $details.fileSize "AIR SDK $Version"
+        Expand-SdkArchive $archive $Destination
+    }
+    if (-not [IO.File]::Exists((Join-Path $Destination 'bin\adt.bat')) -or
+        -not [IO.File]::Exists((Join-Path $Destination 'lib\adt.jar'))) {
+        throw "Downloaded files do not contain a Windows AIR SDK: $Version"
+    }
+    $number = '{0}.{1}.{2}' -f $Version.Major, $Version.Minor, $Version.Build
+    $description = [xml]('<air-sdk-description><name>AIR ' + $number + '</name><version>' + $number + '</version><build>' + $Version.Revision + '</build></air-sdk-description>')
+    $description.Save((Join-Path $Destination 'air-sdk-description.xml'))
+}
+
 function Install-SdkUpdate($Sdk, [version]$Version) {
-    $root = [IO.Path]::GetFullPath((Get-ManagerSetting 'AIR_SDKS'))
+    $root = Get-SdkDirectory
     $current = Get-ChildPath $Sdk.Path $root
     if ((Get-Item -LiteralPath $current).Attributes -band [IO.FileAttributes]::ReparsePoint) {
         throw "SDK updates require a regular directory: $current"
@@ -270,41 +309,11 @@ function Install-SdkUpdate($Sdk, [version]$Version) {
     $backup = Get-ChildPath (Join-Path $backupDirectory ((Split-Path $current -Leaf) + '-' + $Sdk.Version + '-' + [guid]::NewGuid().ToString('N'))) $root
     [IO.Directory]::CreateDirectory($stage) | Out-Null
     try {
-        $manifest = Get-SdkManifest $Version
-        $components = @($manifest.components.PSObject.Properties | Where-Object { $_ -and $_.Name -notin @('linux', 'macos') })
-        $endpoint = Get-ManagerSetting 'API_ENDPOINT'
-        if (-not $endpoint) { $endpoint = 'https://api.airsdk.harman.com' }
-        if ($components.Count) {
-            foreach ($component in $components) {
-                $details = $component.Value
-                if (-not $details.version) { throw "Missing component version: $($component.Name)" }
-                $url = $endpoint.TrimEnd('/') + '/releases/components/' + [uri]::EscapeDataString($component.Name) + '/' + [uri]::EscapeDataString($details.version)
-                $archive = Get-SdkArchive $url $details.checksum $details.fileSize $component.Name 'Post'
-                Expand-SdkArchive $archive $stage
-            }
-        } else {
-            $details = $manifest.urls.AIR_Win
-            if (-not $details.url) { throw "No Windows archive in manifest for $Version." }
-            $url = $details.url
-            if ($url.StartsWith('/')) { $url = 'https://airsdk.harman.com' + $url }
-            if ($url.StartsWith('https://airsdk.harman.com/')) {
-                $separator = if ($url.Contains('?')) { '&' } else { '?' }
-                $url += $separator + 'license=accepted'
-            }
-            $archive = Get-SdkArchive $url $details.checksum $details.fileSize "AIR SDK $Version"
-            Expand-SdkArchive $archive $stage
-        }
-        if (-not [IO.File]::Exists((Join-Path $stage 'bin\adt.bat')) -or
-            -not [IO.File]::Exists((Join-Path $stage 'lib\adt.jar'))) {
-            throw "Downloaded files do not contain a Windows AIR SDK: $Version"
-        }
+        Build-Sdk $Version $stage
         foreach ($name in @('adt.cfg', 'adt.lic')) {
             $source = Join-Path $current ('lib\' + $name)
             if ([IO.File]::Exists($source)) { Copy-Item -LiteralPath $source -Destination (Join-Path $stage ('lib\' + $name)) -Force }
         }
-        $number = '{0}.{1}.{2}' -f $Version.Major, $Version.Minor, $Version.Build
-        $description = [xml]('<air-sdk-description><name>AIR ' + $number + '</name><version>' + $number + '</version><build>' + $Version.Revision + '</build></air-sdk-description>')
-        $description.Save((Join-Path $stage 'air-sdk-description.xml'))
         $original = Read-Sdk (Get-Item -LiteralPath $current)
         if (-not $original -or $original.Version -ne $Sdk.Version) { throw "SDK changed while downloading: $current" }
         [IO.Directory]::CreateDirectory($backupDirectory) | Out-Null
@@ -321,6 +330,59 @@ function Install-SdkUpdate($Sdk, [version]$Version) {
             $safeStage = Get-ChildPath $stage $root
             Remove-Item -LiteralPath $safeStage -Recurse -Force
         }
+    }
+}
+
+function Install-Sdk {
+    $request = $env:ASM_INSTALL_VERSION
+    if (-not $request) { throw 'Usage: asm install VERSION [--accept-license]. Run asm help install.' }
+    if ($request -ne 'latest' -and $request -notmatch '^\d+(\.\d+){0,3}$') {
+        throw 'Expected a version such as 51.4, 51.4.1.1 or latest.'
+    }
+    $root = Get-SdkDirectory
+    if ($request -match '^\d+\.\d+\.\d+\.\d+$') { $version = [version]$request }
+    else {
+        if ($request -ne 'latest') {
+            $request = ($request.Split('.') | ForEach-Object { ([int]$_).ToString() }) -join '.'
+        }
+        $version = Get-ReleaseVersions | Where-Object {
+            $request -eq 'latest' -or $_.ToString().StartsWith($request + '.')
+        } | Sort-Object -Descending | Select-Object -First 1
+        if (-not $version) { throw "No AIR SDK version matches $request. Run asm search." }
+    }
+    if ([IO.Directory]::Exists($root)) {
+        $installed = Get-InstalledSdks | Where-Object { $_.Version -eq $version } | Select-Object -First 1
+        if ($installed) { "AIR SDK $version is already installed at $($installed.Path)"; return }
+    }
+    $destination = Get-ChildPath (Join-Path $root ('AIRSDK_' + $version)) $root
+    if ([IO.Directory]::Exists($destination) -or [IO.File]::Exists($destination)) {
+        throw "Installation path is already occupied: $destination"
+    }
+    if (-not $env:ASM_ACCEPT_LICENSE -and (Get-ManagerSetting 'HAS_ACCEPTED_LICENSE') -ne 'true') {
+        throw 'Accept the AIR SDK license using --accept-license, or use AIR SDK Manager first.'
+    }
+    [IO.Directory]::CreateDirectory($root) | Out-Null
+    $stage = Get-ChildPath (Join-Path $root ('.asm-install-' + [guid]::NewGuid().ToString('N'))) $root
+    $lock = $null
+    try {
+        $lockFile = Join-Path $root '.asm-update.lock'
+        $lock = [IO.File]::Open($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $installed = Get-InstalledSdks | Where-Object { $_.Version -eq $version } | Select-Object -First 1
+        if ($installed) { "AIR SDK $version is already installed at $($installed.Path)"; return }
+        if ([IO.Directory]::Exists($destination) -or [IO.File]::Exists($destination)) {
+            throw "Installation path is already occupied: $destination"
+        }
+        [IO.Directory]::CreateDirectory($stage) | Out-Null
+        "Installing AIR SDK $version at $destination"
+        Build-Sdk $version $stage
+        [IO.Directory]::Move($stage, $destination)
+        "Installed AIR SDK $version at $destination"
+    } finally {
+        if ([IO.Directory]::Exists($stage)) {
+            $safeStage = Get-ChildPath $stage $root
+            Remove-Item -LiteralPath $safeStage -Recurse -Force
+        }
+        if ($lock) { $lock.Dispose() }
     }
 }
 
@@ -371,6 +433,7 @@ try {
         'list' { Show-InstalledSdks }
         'search' { Search-Sdks }
         'update' { Update-Sdks }
+        'install' { Install-Sdk }
     }
     exit 0
 } catch {
