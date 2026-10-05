@@ -9,6 +9,47 @@ runs on Windows, macOS, or Linux without PowerShell or a Go installation.
 
 ## Getting started
 
+### Install a published release
+
+These commands will work once the first release has been published. The
+installers select the native binary and verify it against the release's
+`SHA256SUMS` before installation.
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/emptyenemy/asm/main/install.ps1 | iex
+```
+
+macOS or Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/emptyenemy/asm/main/install.sh | sh
+```
+
+The Windows installer puts `asm.exe` in `%LOCALAPPDATA%\Programs\asm`, updates
+the user `PATH`, and makes `asm` available in the current PowerShell session.
+Other open terminals need to be reopened. The Unix installer uses
+`~/.local/bin` and adds it to `.zshrc`, `.bashrc`, `.bash_profile`, or `.profile`
+for the detected shell. Open a new terminal or source the profile printed by
+the installer. Existing `PATH` entries are kept; repeated installs replace
+only an installation owned by asm. An unrelated command named `asm` stops
+installation with a message identifying the conflict.
+
+To select an asm version or installation directory, download
+[install.ps1](https://raw.githubusercontent.com/emptyenemy/asm/main/install.ps1)
+and run `./install.ps1 -Version 1.0.0 -InstallDirectory C:\Tools\asm`, or use
+`ASM_VERSION=1.0.0` and `ASM_INSTALL_DIR=/absolute/path` when running
+[install.sh](https://raw.githubusercontent.com/emptyenemy/asm/main/install.sh).
+`-NoPath` / `ASM_NO_PATH=1` leaves shell configuration unchanged.
+For local release archives, use `-ArchiveDirectory` / `ASM_ARCHIVE_DIR` with an
+explicit version and a directory containing the matching archive and
+`SHA256SUMS`. Archives, staging files, and previous asm binaries are removed
+after successful installation. The installer configures the asm command;
+AIR SDK paths still come from AIR SDK Manager settings.
+
+### Build from source
+
 During development, build from source with Go 1.25 or newer:
 
 ```sh
@@ -62,7 +103,7 @@ gives the following locations:
 | Linux | `~/.airsdk/airsdkmanager.cfg`, usually `/home/<user>/.airsdk/airsdkmanager.cfg` | Same database name and `AIR_SDKS` setting. |
 
 These paths are established from the manager code and runtime documentation.
-Command and fixture checks have run on Windows and Linux. The manager uses the
+Fixture checks run on all five release targets in GitHub Actions. The manager uses the
 home directory directly, rather than macOS Application Support or an XDG
 configuration directory. Nonstandard home directories must also work.
 
@@ -71,6 +112,10 @@ configuration directory. Nonstandard home directories must also work.
 General help includes a compact ASCII banner. Interactive output uses an
 indigo accent (`#818CF8`), aligned version/path columns, and suggestions for the
 next command. Narrow terminals use stacked entries and wrapped paths.
+The bootstrap installers use the same banner, colors, and custom activity
+indicators. Metadata requests show a spinner; binary downloads show bytes and
+a progress bar when the server supplies a size. `NO_COLOR`, `TERM=dumb`, and
+redirected output are respected by the installers too.
 
 Catalog and manifest requests display a spinner. Downloads use a custom bar
 with transferred bytes, percentage when the total is known, and average speed.
@@ -109,7 +154,7 @@ version. No external dependencies or terminal UI library are required.
 | `asm update --all --check` | Preview all installed updates and the new-branch notice. |
 
 Angle brackets mark required arguments; square brackets mark optional ones.
-Replace `VERSION` with a number or `latest`; do not type the brackets.
+Replace `VERSION` with the appropriate value; do not type the brackets.
 
 Help is also available through `asm --help`, `asm -h`, and commands such as
 `asm install --help` or `asm update -h`. `install` currently requires a version.
@@ -380,7 +425,8 @@ help because other managers assign them different meanings.
 ## Builds and releases
 
 The GitHub Actions `Build` workflow runs tests and `go vet` on native runners
-and builds these targets:
+and builds these targets. Each job also installs and reinstalls its own archive
+with the matching bootstrap installer and checks the installed version:
 
 | Host | Go target | Release archive |
 | --- | --- | --- |
@@ -404,21 +450,16 @@ published as part of this migration.
 
 The Go CLI implements the existing commands, `uninstall`/`remove`, terminal
 presentation, home-based configuration, host archive selection, and platform
-setup. The remaining steps in this iteration are:
+setup. Native builds, fixture tests, and release installers cover Windows
+amd64, macOS amd64/arm64, and Linux amd64/arm64.
 
-1. **Validate supported SDK hosts.** Target Windows amd64, macOS amd64/arm64,
-   and Linux amd64/arm64. Builds exist for all five targets; fixture tests have
-   run on Windows and Linux. The
-   [Linux SDK documentation](https://airsdk.dev/docs/basics/install/linux)
-   explicitly supports x86_64 and ARM64; Linux SDK tools require a commercial
-   AIR license. See also the
-   [macOS](https://airsdk.dev/docs/basics/install/macos) and
-   [Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
-   Full SDK/tool checks on each host are still required before calling the
-   first version ready.
-2. **Install from a release.** Provide `install.ps1` and `install.sh` that
-   select the matching binary, verify its checksum, install per user, and set
-   up `PATH`. Detect unrelated commands named `asm` and remove temporary files.
+Before the first release, full SDK downloads and tool execution still need
+validation on each supported host. The
+[Linux SDK documentation](https://airsdk.dev/docs/basics/install/linux)
+explicitly supports x86_64 and ARM64; Linux SDK tools require a commercial
+AIR license. See also the
+[macOS](https://airsdk.dev/docs/basics/install/macos) and
+[Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
 
 Each feature is committed separately. Development continues on `1.0.0`;
 published releases and tags will be added only once that version is ready.
@@ -463,3 +504,10 @@ uninstall ambiguity. Linux checks also cover architecture setup and legacy
 path corrections; Unix checks cover symbolic links. Test directories are
 removed automatically. Full SDK downloads and tools still need separate
 validation on each target.
+
+Bootstrap checks run from the archives built by GitHub Actions, using isolated
+installation directories without changing `PATH`. Local installer checks on
+Windows (PowerShell 5.1 and 7) and Linux also cover repeat installation,
+checksum failures, unrelated files, archive contents, cleanup, and paths with
+spaces and special characters. Shell profile changes are tested in an isolated
+home directory.

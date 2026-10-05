@@ -75,6 +75,39 @@ jobs:
           python=python3
           if [ "$TARGET_OS" = windows ]; then python=python; fi
           ARCHIVE="$archive" "$python" -c 'import hashlib, os, pathlib; p = pathlib.Path("dist") / os.environ["ARCHIVE"]; (pathlib.Path("dist") / (p.name + ".sha256")).write_text(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n")'
+      - name: Check the bootstrap installer
+        shell: bash
+        env:
+          TARGET_OS: ${{ matrix.os }}
+        run: |
+          set -eu
+          cat dist/*.sha256 > dist/SHA256SUMS
+          export BOOTSTRAP_VERSION="$(basename dist/*.sha256 | cut -d_ -f2)"
+          if [ "$TARGET_OS" = windows ]; then
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
+              $ErrorActionPreference = "Stop"
+              $target = Join-Path $env:RUNNER_TEMP "asm-bootstrap"
+              $archives = Join-Path $env:GITHUB_WORKSPACE "dist"
+              & ./install.ps1 -Version $env:BOOTSTRAP_VERSION -ArchiveDirectory $archives -InstallDirectory $target -NoPath
+              & ./install.ps1 -Version $env:BOOTSTRAP_VERSION -ArchiveDirectory $archives -InstallDirectory $target -NoPath
+              $actual = & (Join-Path $target "asm.exe") --version
+              if ($LASTEXITCODE -ne 0 -or $actual -ne $env:BOOTSTRAP_VERSION) { throw "Installed version mismatch" }
+              $resolved = [IO.Path]::GetFullPath($target)
+              $parent = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd("\") + "\"
+              if (-not $resolved.StartsWith($parent, [StringComparison]::OrdinalIgnoreCase)) { throw "Unsafe test cleanup path" }
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            '
+          else
+            sh -n install.sh
+            export ASM_VERSION="$BOOTSTRAP_VERSION" ASM_ARCHIVE_DIR="$PWD/dist"
+            export ASM_INSTALL_DIR="$RUNNER_TEMP/asm-bootstrap/bin" ASM_NO_PATH=1
+            sh install.sh
+            sh install.sh
+            test "$("$ASM_INSTALL_DIR/asm" --version)" = "$BOOTSTRAP_VERSION"
+            test ! -e "$ASM_INSTALL_DIR/.asm-install.lock"
+            rm -f "$ASM_INSTALL_DIR/asm" "$ASM_INSTALL_DIR/.asm-install"
+            rmdir "$ASM_INSTALL_DIR" "$RUNNER_TEMP/asm-bootstrap"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: asm-${{ matrix.os }}-${{ matrix.arch }}
