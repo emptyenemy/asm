@@ -235,7 +235,7 @@ func (t *terminal) help(topic string) {
 		t.line("", "")
 		t.wrap("Usage: asm <command> [options]", 2, "")
 		t.line("", "")
-		entries := [][]string{{"list, ls", "List installed SDKs and their paths."}, {"search [VERSION]", "Find available stable releases."}, {"install VERSION", "Install a branch, exact build, or latest."}, {"update [VERSION]", "Check updates; a version applies them."}, {"uninstall VERSION", "Remove one installed SDK. Alias: remove."}, {"help [COMMAND]", "Show general or command help."}, {"--version, -v", "Print the asm version."}}
+		entries := [][]string{{"list, ls", "List installed SDKs and their paths."}, {"search [VERSION]", "Find available stable releases."}, {"install <VERSION>", "Install a branch, exact build, or latest."}, {"update [VERSION]", "Check updates; a version applies them."}, {"uninstall <VERSION>", "Remove one installed SDK. Alias: remove."}, {"help [COMMAND]", "Show general or command help."}, {"--version, -v", "Print the asm version."}}
 		for _, entry := range entries {
 			if t.width() >= 70 {
 				t.line("  "+t.style(fmt.Sprintf("%-20s", entry[0]), "accent")+entry[1], "")
@@ -250,11 +250,11 @@ func (t *terminal) help(topic string) {
 		t.line("", "")
 		return
 	}
-	usage := map[string]string{"list": "asm list", "search": "asm search [VERSION]", "install": "asm install VERSION [--accept-license]", "update": "asm update [VERSION] [--all] [--check] [--accept-license]", "uninstall": "asm uninstall VERSION"}
+	usage := map[string]string{"list": "asm list", "search": "asm search [VERSION]", "install": "asm install <VERSION> [--accept-license]", "update": "asm update [VERSION] [--all] [--check] [--accept-license]", "uninstall": "asm uninstall <VERSION>"}
 	t.wrap("Usage: "+usage[topic], 2, "accent")
 	t.line("", "")
 	lines := map[string][]string{
-		"uninstall": {"Alias: asm remove VERSION", "VERSION: an exact build or a prefix matching one installed SDK.", "Ambiguous versions are rejected; use a full version from asm list.", "Deletes that SDK directory from AIR_SDKS without keeping a backup.", "Does not change AIR SDK Manager settings or PATH."},
+		"uninstall": {"Alias: asm remove <VERSION>", "VERSION: an exact build or a prefix matching one installed SDK.", "Ambiguous versions are rejected; use a full version from asm list.", "Deletes that SDK directory from AIR_SDKS without keeping a backup.", "Does not change AIR SDK Manager settings or PATH."},
 		"list":      {"Alias: asm ls", "Reads AIR_SDKS from ~/.airsdk/airsdkmanager.cfg.", "Lists installed SDK versions and paths, newest first."},
 		"search":    {"VERSION is optional: a branch such as 51.4 or an exact build.", "Lists announced stable releases, newest first.", "Falls back to the manager catalog when the source is unavailable."},
 		"install":   {"VERSION: a branch such as 51.4, an exact build, or latest.", "Installs into AIR_SDKS; an installed build is kept.", "--accept-license  Accept the AIR SDK license for this operation."},

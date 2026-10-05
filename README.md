@@ -100,13 +100,16 @@ version. No external dependencies or terminal UI library are required.
 | `asm --version`, `asm -v` | Print only the manager version: `1.0.0`. |
 | `asm list`, `asm ls` | List installed SDK versions and absolute paths. |
 | `asm search [VERSION]` | List announced stable releases, newest first. |
-| `asm install VERSION` | Install a branch, an exact build, or `latest`. |
-| `asm uninstall VERSION`, `asm remove VERSION` | Delete one installed SDK selected by exact version or an unambiguous prefix. |
+| `asm install <VERSION>` | Install a branch, an exact build, or `latest`. |
+| `asm uninstall <VERSION>`, `asm remove <VERSION>` | Delete one installed SDK selected by exact version or an unambiguous prefix. |
 | `asm update` | Show updates for installed SDKs and announce a newer uninstalled branch. |
-| `asm update VERSION` | Update matching installed SDKs. |
+| `asm update <VERSION>` | Update matching installed SDKs. |
 | `asm update --all` | Update every installed SDK that has a newer build. |
-| `asm update VERSION --check` | Preview updates for selected SDKs. |
+| `asm update <VERSION> --check` | Preview updates for selected SDKs. |
 | `asm update --all --check` | Preview all installed updates and the new-branch notice. |
+
+Angle brackets mark required arguments; square brackets mark optional ones.
+Replace `VERSION` with a number or `latest`; do not type the brackets.
 
 Help is also available through `asm --help`, `asm -h`, and commands such as
 `asm install --help` or `asm update -h`. `install` currently requires a version.
