@@ -1,4 +1,4 @@
-param([ValidateSet('list', 'search', 'update', 'install', 'help')][string]$Command = 'list', [string]$Topic = '')
+param([ValidateSet('list', 'search', 'update', 'install', 'help', 'version')][string]$Command = 'list', [string]$Topic = '')
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -491,6 +491,7 @@ try {
         'update' { Update-Sdks }
         'install' { Install-Sdk }
         'help' { Show-AsmHelp $Topic }
+        'version' { Write-AsmLine $script:AsmVersion 'Accent' }
     }
     exit 0
 } catch {

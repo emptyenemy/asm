@@ -1,8 +1,6 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-set "ASM_VERSION=1.0.0"
-
 if "%~1"=="" goto help
 if /i "%~1"=="--help" goto help
 if /i "%~1"=="-h" goto help
@@ -35,8 +33,8 @@ exit /b %errorlevel%
 
 :version
 if not "%~2"=="" goto unexpected_arguments
-echo %ASM_VERSION%
-exit /b 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0sdk.ps1" version
+exit /b %errorlevel%
 
 :list
 if /i "%~2"=="--help" goto list_help

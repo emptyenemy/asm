@@ -78,7 +78,8 @@ Progress goes to stderr and clears on completion or error. Redirecting either
 output stream disables colors and animation; `TERM=dumb` does the same.
 `NO_COLOR` disables colors while retaining activity in an interactive terminal.
 Redirected search results remain one full version per line, without headings or
-installation suggestions. `--version` always prints only `1.0.0`.
+installation suggestions. `--version` and `-v` print only `1.0.0`, accented in
+an interactive terminal and plain when redirected or with `NO_COLOR`.
 
 The runtime remains small: `asm.bat` dispatches commands, `sdk.ps1` manages SDKs,
 and `terminal.ps1` handles presentation and HTTP transfers. Keep these files

@@ -1,3 +1,4 @@
+$script:AsmVersion = '1.0.0'
 $script:AsmInteractive = -not [Console]::IsOutputRedirected -and -not [Console]::IsErrorRedirected -and $env:TERM -ne 'dumb'
 $script:AsmColor = $false
 $script:AsmEscape = [char]27
@@ -201,7 +202,7 @@ function Invoke-AsmRequest([string]$Url, [string]$Label, [string]$Destination = 
     Add-Type -AssemblyName System.Net.Http
     $client = [Net.Http.HttpClient]::new()
     $client.Timeout = [Threading.Timeout]::InfiniteTimeSpan
-    $client.DefaultRequestHeaders.UserAgent.ParseAdd('asm/1.0.0')
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd('asm/' + $script:AsmVersion)
     $cancel = [Threading.CancellationTokenSource]::new()
     $request = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($Method), $Url)
     $response = $null
@@ -251,7 +252,7 @@ function Show-AsmHelp([string]$Topic) {
             }
         } else { Write-AsmLine '  asm' 'Accent' }
         Write-AsmLine
-        Write-AsmWrapped 'AIR SDK Manager  1.0.0' 2 'Muted'
+        Write-AsmWrapped ('AIR SDK Manager  ' + $script:AsmVersion) 2 'Muted'
         Write-AsmLine
         Write-AsmWrapped 'Usage: asm <command> [options]' 2
         Write-AsmLine
