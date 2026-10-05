@@ -211,23 +211,23 @@ function Get-ArchiveHash([string]$File) {
     finally { $stream.Dispose(); $algorithm.Dispose() }
 }
 
-function Get-SdkArchive([string]$Url, [string]$Checksum, [long]$Size, [string]$Name, [string]$Method = 'Get') {
+function Get-SdkArchive([string]$Url, [string]$Checksum, [long]$Size, [string]$Name, [string]$Destination, [string]$Method = 'Get') {
     $Checksum = $Checksum.Trim()
     if ($Checksum -notmatch '^[a-fA-F0-9]{64}$') { throw "Invalid SHA-256 for $Name." }
-    $cacheDirectory = Join-Path (Split-Path $configFile -Parent) 'asm-cache'
-    [IO.Directory]::CreateDirectory($cacheDirectory) | Out-Null
-    $file = Join-Path $cacheDirectory ($Checksum.ToLowerInvariant() + '.zip')
-    if ([IO.File]::Exists($file) -and ($Size -le 0 -or (Get-Item -LiteralPath $file).Length -eq $Size) -and
-        (Get-ArchiveHash $file) -eq $Checksum) { return $file }
+    $file = Get-ChildPath (Join-Path $Destination ('.asm-download-' + [guid]::NewGuid().ToString('N') + '.zip')) $Destination
     $temporary = $file + '.download'
     try {
         Write-Host "Downloading $Name..."
         $arguments = @{ Uri = $Url; Method = $Method; OutFile = $temporary; TimeoutSec = 600; UseBasicParsing = $true }
         if ($Method -eq 'Post') { $arguments.Body = @{ acceptedLicense = 'true' } }
-        Invoke-WebRequest @arguments | Out-Null
+        Push-Location -LiteralPath $Destination
+        try {
+            $arguments.OutFile = [IO.Path]::GetFileName($temporary)
+            Invoke-WebRequest @arguments | Out-Null
+        } finally { Pop-Location }
         if ($Size -gt 0 -and (Get-Item -LiteralPath $temporary).Length -ne $Size) { throw "Download size mismatch for $Name." }
         if ((Get-ArchiveHash $temporary) -ne $Checksum) { throw "SHA-256 mismatch for $Name." }
-        Move-Item -LiteralPath $temporary -Destination $file -Force
+        [IO.File]::Move($temporary, $file)
         $file
     } finally {
         if ([IO.File]::Exists($temporary)) { Remove-Item -LiteralPath $temporary -Force }
@@ -244,9 +244,10 @@ function Get-ChildPath([string]$Path, [string]$Root) {
 }
 
 function Expand-SdkArchive([string]$File, [string]$Destination) {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = [IO.Compression.ZipFile]::OpenRead($File)
+    $archive = $null
     try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [IO.Compression.ZipFile]::OpenRead($File)
         foreach ($entry in $archive.Entries) {
             if ($entry.FullName -match ':|^[/\\]') { throw "Invalid ZIP entry: $($entry.FullName)" }
             $target = Get-ChildPath (Join-Path $Destination $entry.FullName) $Destination
@@ -257,7 +258,10 @@ function Expand-SdkArchive([string]$File, [string]$Destination) {
                 [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
             }
         }
-    } finally { $archive.Dispose() }
+    } finally {
+        if ($archive) { $archive.Dispose() }
+        if ([IO.File]::Exists($File)) { Remove-Item -LiteralPath $File -Force }
+    }
 }
 
 function Build-Sdk([version]$Version, [string]$Destination) {
@@ -270,7 +274,7 @@ function Build-Sdk([version]$Version, [string]$Destination) {
             $details = $component.Value
             if (-not $details.version) { throw "Missing component version: $($component.Name)" }
             $url = $endpoint.TrimEnd('/') + '/releases/components/' + [uri]::EscapeDataString($component.Name) + '/' + [uri]::EscapeDataString($details.version)
-            $archive = Get-SdkArchive $url $details.checksum $details.fileSize $component.Name 'Post'
+            $archive = Get-SdkArchive $url $details.checksum $details.fileSize $component.Name $Destination 'Post'
             Expand-SdkArchive $archive $Destination
         }
     } else {
@@ -282,7 +286,7 @@ function Build-Sdk([version]$Version, [string]$Destination) {
             $separator = if ($url.Contains('?')) { '&' } else { '?' }
             $url += $separator + 'license=accepted'
         }
-        $archive = Get-SdkArchive $url $details.checksum $details.fileSize "AIR SDK $Version"
+        $archive = Get-SdkArchive $url $details.checksum $details.fileSize "AIR SDK $Version" $Destination
         Expand-SdkArchive $archive $Destination
     }
     if (-not [IO.File]::Exists((Join-Path $Destination 'bin\adt.bat')) -or
@@ -301,12 +305,7 @@ function Install-SdkUpdate($Sdk, [version]$Version) {
         throw "SDK updates require a regular directory: $current"
     }
     $stage = Get-ChildPath (Join-Path $root ('.asm-update-' + [guid]::NewGuid().ToString('N'))) $root
-    $backupDirectory = Get-ChildPath (Join-Path $root '.asm-backups') $root
-    if ([IO.Directory]::Exists($backupDirectory) -and
-        ((Get-Item -LiteralPath $backupDirectory).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        throw "Backup directory must not be a link: $backupDirectory"
-    }
-    $backup = Get-ChildPath (Join-Path $backupDirectory ((Split-Path $current -Leaf) + '-' + $Sdk.Version + '-' + [guid]::NewGuid().ToString('N'))) $root
+    $backup = Get-ChildPath (Join-Path $root ('.asm-old-' + [guid]::NewGuid().ToString('N'))) $root
     [IO.Directory]::CreateDirectory($stage) | Out-Null
     try {
         Build-Sdk $Version $stage
@@ -316,15 +315,19 @@ function Install-SdkUpdate($Sdk, [version]$Version) {
         }
         $original = Read-Sdk (Get-Item -LiteralPath $current)
         if (-not $original -or $original.Version -ne $Sdk.Version) { throw "SDK changed while downloading: $current" }
-        [IO.Directory]::CreateDirectory($backupDirectory) | Out-Null
-        Move-Item -LiteralPath $current -Destination $backup
-        try { Move-Item -LiteralPath $stage -Destination $current }
+        [IO.Directory]::Move($current, $backup)
+        try { [IO.Directory]::Move($stage, $current) }
         catch {
-            if (-not [IO.Directory]::Exists($current)) { Move-Item -LiteralPath $backup -Destination $current }
+            if ([IO.Directory]::Exists($current) -or [IO.File]::Exists($current)) {
+                throw "Cannot replace SDK: $current. Original SDK remains at $backup."
+            }
+            try { [IO.Directory]::Move($backup, $current) }
+            catch { throw "Cannot restore SDK. Original SDK remains at $backup. $($_.Exception.Message)" }
             throw
         }
+        $safeBackup = Get-ChildPath $backup $root
+        Remove-Item -LiteralPath $safeBackup -Recurse -Force
         "Updated $($Sdk.Version) -> $Version at $current"
-        "Backup: $backup"
     } finally {
         if ([IO.Directory]::Exists($stage)) {
             $safeStage = Get-ChildPath $stage $root
@@ -366,7 +369,7 @@ function Install-Sdk {
     $lock = $null
     try {
         $lockFile = Join-Path $root '.asm-update.lock'
-        $lock = [IO.File]::Open($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $lock = [IO.FileStream]::new($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None, 4096, [IO.FileOptions]::DeleteOnClose)
         $installed = Get-InstalledSdks | Where-Object { $_.Version -eq $version } | Select-Object -First 1
         if ($installed) { "AIR SDK $version is already installed at $($installed.Path)"; return }
         if ([IO.Directory]::Exists($destination) -or [IO.File]::Exists($destination)) {
@@ -423,7 +426,7 @@ function Update-Sdks {
     $lock = $null
     try {
         $lockFile = Join-Path (Get-ManagerSetting 'AIR_SDKS') '.asm-update.lock'
-        $lock = [IO.File]::Open($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $lock = [IO.FileStream]::new($lockFile, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None, 4096, [IO.FileOptions]::DeleteOnClose)
         foreach ($update in $updates) { Install-SdkUpdate $update.Sdk $update.Available }
     } finally { if ($lock) { $lock.Dispose() } }
 }
