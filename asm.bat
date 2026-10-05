@@ -74,9 +74,9 @@ exit /b %errorlevel%
 if not "%~3"=="" goto unexpected_arguments
 echo Usage: asm search [VERSION]
 echo.
-echo Searches stable SDK versions using the AIR SDK Manager API.
+echo Searches stable SDK releases in the official AIR SDK announcement archive.
 echo VERSION can be a branch such as 51.4 or a full build such as 51.4.1.1.
-echo Uses the manager's cached catalog if the API is unavailable.
+echo Uses the manager's cached catalog if the release source is unavailable.
 exit /b 0
 
 :unexpected_arguments

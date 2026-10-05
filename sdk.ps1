@@ -92,21 +92,34 @@ function Get-CachedCatalog {
     }
 }
 
-function Search-Sdks {
-    $filter = $env:ASM_SEARCH_VERSION
-    if ($filter) {
-        if ($filter -notmatch '^\d+(\.\d+){0,3}$') { throw 'Expected a version such as 51.4 or 51.4.1.1.' }
-        $filter = ($filter.Split('.') | ForEach-Object { ([int]$_).ToString() }) -join '.'
-    }
+function Get-NewsVersions {
+    $html = (Invoke-WebRequest -UseBasicParsing -Uri 'https://airsdk.dev/news/archive' -TimeoutSec 15 -UserAgent 'asm/1.0.0').Content
+    $previews = @('51.0.0.2', '51.0.0.4')
+    $pattern = '(?is)<a\b[^>]*\bhref="/news/\d{4}/\d{2}/\d{2}/[^"\s]+"[^>]*>(?<title>.*?)</a>'
+    $versions = @(
+        foreach ($link in [regex]::Matches($html, $pattern)) {
+            $title = [Net.WebUtility]::HtmlDecode([regex]::Replace($link.Groups['title'].Value, '<[^>]*>', ''))
+            if ($title -notmatch '\bRelease\s+(\d+\.\d+\.\d+\.\d+)\b') { continue }
+            $number = $Matches[1]
+            if ($title -match '\b(beta|alpha|preview|pre[ -]?release)\b' -or $number -in $previews) { continue }
+            [version]$number
+        }
+    )
+    if (-not $versions.Count) { throw 'The AIR SDK announcement archive contains no recognized releases.' }
+    $versions | Sort-Object -Unique -Descending
+}
+
+function Get-ReleaseVersions {
     $endpoint = Get-ManagerSetting 'API_ENDPOINT'
-    if (-not $endpoint) { $endpoint = 'https://api.airsdk.harman.com' }
-    $uri = $endpoint.TrimEnd('/') + '/releases?types=production'
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        $response = Invoke-RestMethod -Uri $uri -Method Get -TimeoutSec 15 -UserAgent 'asm/1.0.0'
-        if ($response.errorType) { throw "AIR SDK API returned $($response.errorType)." }
-        if ($response.releases -isnot [array]) { throw 'AIR SDK API response has no releases array.' }
-        $versions = @(Convert-Releases $response.releases)
+        if ($endpoint) {
+            $uri = $endpoint.TrimEnd('/') + '/releases?types=production'
+            $response = Invoke-RestMethod -Uri $uri -Method Get -TimeoutSec 15 -UserAgent 'asm/1.0.0'
+            if ($response.errorType) { throw "AIR SDK API returned $($response.errorType)." }
+            if ($response.releases -isnot [array]) { throw 'AIR SDK API response has no releases array.' }
+            $versions = @(Convert-Releases $response.releases)
+        } else { $versions = @(Get-NewsVersions) }
     } catch {
         $apiError = $_.Exception.Message
         $cache = Get-CachedCatalog
@@ -114,6 +127,16 @@ function Search-Sdks {
         [Console]::Error.WriteLine("Warning: {0} Using cached AIR SDK Manager catalog: {1}", $apiError, $cache.File)
         $versions = $cache.Versions
     }
+    $versions
+}
+
+function Search-Sdks {
+    $filter = $env:ASM_SEARCH_VERSION
+    if ($filter) {
+        if ($filter -notmatch '^\d+(\.\d+){0,3}$') { throw 'Expected a version such as 51.4 or 51.4.1.1.' }
+        $filter = ($filter.Split('.') | ForEach-Object { ([int]$_).ToString() }) -join '.'
+    }
+    $versions = @(Get-ReleaseVersions)
     $matches = @(
         $versions | Where-Object {
             -not $filter -or $_.ToString() -eq $filter -or $_.ToString().StartsWith($filter + '.')
