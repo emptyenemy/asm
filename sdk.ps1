@@ -60,7 +60,7 @@ function Get-InstalledSdks {
         Get-ChildItem -LiteralPath $sdkDirectory -Directory |
             Where-Object { $_.Name -notlike '.asm-*' } |
             ForEach-Object { Read-Sdk $_ } |
-            Sort-Object Version
+            Sort-Object Version -Descending
     )
     $sdks
 }

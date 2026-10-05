@@ -119,7 +119,7 @@ Folder names are arbitrary. Versions come from `air-sdk-description.xml`:
 `<version>51.3.4</version>` and `<build>3</build>` produce `51.3.4.3`.
 A four-component number in `<version>` is also supported.
 
-Versions are sorted numerically. Directories without a description are skipped;
+Versions are sorted numerically, newest first. Directories without a description are skipped;
 invalid descriptions produce a warning. Missing settings, an empty `AIR_SDKS`,
 or a missing SDK root are errors. An existing empty root produces an explanatory
 message and returns `0`.
