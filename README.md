@@ -50,7 +50,7 @@ AIR SDK paths still come from AIR SDK Manager settings.
 
 ### Build from source
 
-During development, build from source with Go 1.25 or newer:
+During development, build from source with Go 1.27.1 or newer:
 
 ```sh
 go build .
@@ -441,7 +441,8 @@ requests produce workflow artifacts kept for seven days. Pushing a version
 tag such as `v1.0.0` publishes the five archives and `SHA256SUMS` to
 [GitHub Releases](https://github.com/emptyenemy/asm/releases) after every build
 passes. The tag supplies the binary version, without the `v` prefix.
-Releases use Go 1.27; their OS minimums follow that toolchain.
+Releases use the latest stable patch of Go 1.27; their OS minimums follow that
+toolchain. New dependencies should use their current stable versions.
 
 Version 1.0.0 is still being developed. No version tag or release has been
 published as part of this migration.
