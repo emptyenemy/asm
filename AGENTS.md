@@ -25,8 +25,10 @@ it.
 
 ## Code layout
 
-The root `main.go` starts the CLI and supplies its build version, and `go.mod`
-declares the import path and the minimum Go version. Everything else lives in
+The root `main.go` starts the CLI and supplies its build version, `go.mod`
+declares the import path and the minimum Go version, and
+`icon_windows_amd64.syso` gives the Windows executable its
+[icon](#windows-icon). Everything else lives in
 one package, `internal/cli`, one concern per file:
 
 | File | Responsibility |
@@ -133,6 +135,25 @@ The same command with the same toolchain on the same commit produces a
 byte-identical binary, so a downloaded archive can be checked by rebuilding it.
 A working tree with uncommitted changes is not identical to a released one: the
 VCS stamp records that it was modified.
+
+### Windows icon
+
+`icon_windows_amd64.syso` in the repository root gives `asm.exe` its icon.
+`go build` links any `*_windows_amd64.syso` beside `main.go` into a Windows
+x64 build on its own, so no flag or build dependency is involved, and other
+targets ignore the file. It holds the icon only, without a manifest, so the
+executable behaves exactly as it would without it.
+
+The icon is `.github/assets/icon.ico`, the page's favicon drawn at sizes from
+16 to 256 pixels with JetBrains Mono Bold. After changing it, regenerate the
+object file from the repository root and commit both:
+
+```sh
+go run github.com/tc-hib/go-winres@v0.3.3 simply --icon .github/assets/icon.ico --manifest none --arch amd64 --out icon
+```
+
+`go run` with a version fetches the tool for that one command; it is not added
+to `go.mod`.
 
 ## Downloads and SDK assembly
 
