@@ -27,19 +27,19 @@ it.
 
 The root `main.go` starts the CLI and supplies its build version, and `go.mod`
 declares the import path and the minimum Go version. Everything else lives in
-one `modules` package:
+one package, `internal/cli`:
 
 | File | Responsibility |
 | --- | --- |
-| `modules/app.go` | Command dispatch, options, the settings file, installed SDK discovery, the SDK version type and its parsing. |
-| `modules/terminal.go` | Output rendering and the command help. |
-| `modules/sdk.go` | Platform selection and the small helpers shared across files. |
-| `modules/catalog.go` | Release lists and build manifests from the official API, the announcement archive and the manager catalog. |
-| `modules/download.go` | Archive downloads: retries, resuming, verification, leftover partial files. |
-| `modules/extract.go` | ZIP extraction and the path checks that keep it inside the SDK directory. |
-| `modules/install.go` | `install`, `update`, `uninstall` and SDK assembly. |
-| `modules/clean.go` | Removing what an interrupted operation left behind. |
-| `modules/platform_unix.go`, `modules/platform_windows.go` | The per-OS pieces: locking, directory moves, SDK configuration. |
+| `internal/cli/app.go` | Command dispatch, options, the settings file, installed SDK discovery, the SDK version type and its parsing. |
+| `internal/cli/terminal.go` | Output rendering and the command help. |
+| `internal/cli/sdk.go` | Platform selection and the small helpers shared across files. |
+| `internal/cli/catalog.go` | Release lists and build manifests from the official API, the announcement archive and the manager catalog. |
+| `internal/cli/download.go` | Archive downloads: retries, resuming, verification, leftover partial files. |
+| `internal/cli/extract.go` | ZIP extraction and the path checks that keep it inside the SDK directory. |
+| `internal/cli/install.go` | `install`, `update`, `uninstall` and SDK assembly. |
+| `internal/cli/clean.go` | Removing what an interrupted operation left behind. |
+| `internal/cli/platform_unix.go`, `internal/cli/platform_windows.go` | The per-OS pieces: locking, directory moves, SDK configuration. |
 
 No external dependencies or terminal UI library are required.
 
@@ -51,12 +51,12 @@ without a network: no CDN, no web fonts, no analytics.
 
 Five places, all of them:
 
-1. `modules/app.go` — add the name to `validCommand`.
-2. `modules/app.go` — add a `case` to the switch in `run`, and reject unwanted
+1. `internal/cli/app.go` — add the name to `validCommand`.
+2. `internal/cli/app.go` — add a `case` to the switch in `run`, and reject unwanted
    arguments the way the neighbouring cases do.
-3. `modules/app.go` — if the command takes options, handle them in
+3. `internal/cli/app.go` — if the command takes options, handle them in
    `parseOptions` and reject the flags it does not accept.
-4. `modules/terminal.go` — add the name to `help`: the `usage` map, the `lines`
+4. `internal/cli/terminal.go` — add the name to `help`: the `usage` map, the `lines`
    map, and the `entries` list in the general help.
 5. `README.md` — add a row to the command table.
 
