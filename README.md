@@ -299,3 +299,11 @@ report without changing anything.
 [AGENTS.md](AGENTS.md) covers the code layout, the steps for adding a command,
 the commit conventions, the test approach, and the notes on the AIR SDK sources
 asm talks to.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+The AIR SDK itself is a separate product, licensed by HARMAN. asm will not
+download it until that license has been accepted, either in the manager
+configuration or with `--accept-license` for a single operation.
