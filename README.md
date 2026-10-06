@@ -56,6 +56,24 @@ During development, build from source with Go 1.27.1 or newer:
 go build .
 ```
 
+That binary is larger than a released one, because it keeps the symbol table
+and debug information. The release workflow strips them, bakes the version in,
+and disables cgo; the same command locally is:
+
+```sh
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=1.0.0" .
+```
+
+On Windows, set `CGO_ENABLED=0` in the environment before running the command.
+
+`-s -w` removes the symbol table and DWARF, which is most of the size
+difference, and `-trimpath` keeps build-machine paths out of the binary.
+Panic messages still name functions and lines, because the runtime's own
+function table is not removed. `CGO_ENABLED=0` keeps the build pure Go, which
+on Linux produces a statically linked binary with no libc dependency, and it is
+what the release workflow uses. Use the version you are building in place of
+`1.0.0`; release archives take it from the tag.
+
 From the project directory in cmd after building:
 
 ```bat
