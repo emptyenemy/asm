@@ -343,7 +343,10 @@ with the matching bootstrap installer and checks the installed version:
 | Linux x64 | `linux/amd64` | `asm_<version>_linux_amd64.tar.gz` |
 | Linux ARM64 | `linux/arm64` | `asm_<version>_linux_arm64.tar.gz` |
 
-Each archive contains the executable and README. Ordinary commits and pull
+Each archive contains the executable and README. The archived README is
+written by `.github/scripts/archive_readme.py`, which points its images and
+links at the release commit on GitHub, since the files they name are not in
+the archive. Ordinary commits and pull
 requests produce workflow artifacts kept for seven days. Pushing a version
 tag such as `v1.0.0` publishes the five archives and `SHA256SUMS` to
 [GitHub Releases](https://github.com/emptyenemy/asm/releases) after every build

@@ -65,7 +65,9 @@ jobs:
           if [ "$TARGET_OS" = windows ]; then executable=asm.exe; fi
           go build -trimpath -ldflags "-s -w -X main.version=$release_version" -o "dist/$name/$executable" .
           "dist/$name/$executable" --version
-          cp README.md "dist/$name/README.md"
+          python=python3
+          if [ "$TARGET_OS" = windows ]; then python=python; fi
+          "$python" .github/scripts/archive_readme.py README.md "dist/$name/README.md" "$GITHUB_REPOSITORY" "$GITHUB_SHA"
           if [ "$TARGET_OS" = windows ]; then
             archive="$name.zip"
             powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/$name/*' -DestinationPath 'dist/$archive'"
@@ -73,8 +75,6 @@ jobs:
             archive="$name.tar.gz"
             tar -czf "dist/$archive" -C "dist/$name" asm README.md
           fi
-          python=python3
-          if [ "$TARGET_OS" = windows ]; then python=python; fi
           # write_bytes, not write_text: on Windows write_text turns the LF into
           # CRLF, and one CRLF line breaks sha256sum -c on the combined file.
           ARCHIVE="$archive" "$python" -c 'import hashlib, os, pathlib; p = pathlib.Path("dist") / os.environ["ARCHIVE"]; (pathlib.Path("dist") / (p.name + ".sha256")).write_bytes((hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n").encode())'
