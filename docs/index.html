@@ -3,132 +3,213 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>asm — AIR SDK Manager as a command-line tool</title>
-<meta name="description" content="Install, update, and remove AIR SDK builds from the command line. One native binary for Windows, macOS, and Linux. MIT licensed.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23101322'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='15' fill='%23818CF8' text-anchor='middle'%3Ea%3C/text%3E%3C/svg%3E">
+<title>asm · AIR SDK versions from your terminal</title>
+<meta name="description" content="Find, install, update and remove AIR SDK builds from the command line. One native binary for Windows, macOS and Linux. MIT licensed.">
+<meta name="theme-color" content="#0f1026">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="asm: AIR SDK versions from your terminal">
+<meta property="og:description" content="Find, install, update and remove AIR SDK builds. One native binary for Windows, macOS and Linux.">
+<meta property="og:url" content="https://emptyenemy.github.io/asm/">
+<meta property="og:image" content="https://emptyenemy.github.io/asm/asm-help.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1026'/%3E%3Ctext x='5' y='22' font-family='monospace' font-size='17' font-weight='700' fill='%23818cf8'%3Ea%3C/text%3E%3Crect x='18' y='19' width='8' height='3' fill='%23c4b5fd'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>
-  <div class="wrap masthead">
-    <a class="wordmark" href="#top">asm<b>_</b></a>
-    <nav>
-      <a href="#install">Install</a>
-      <a href="#commands">Commands</a>
-      <a href="#config">Configuration</a>
-      <a href="#limits">Limits</a>
-      <a href="https://github.com/emptyenemy/asm">GitHub</a>
-      <a href="https://github.com/emptyenemy/asm/releases">Releases</a>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <div class="col bar-inner">
+    <a class="mark" href="#top" aria-label="asm, back to top">asm<span class="cursor" aria-hidden="true">_</span></a>
+    <nav aria-label="Sections">
+      <a href="#install" data-key="1"><kbd>1</kbd>install</a>
+      <a href="#why" data-key="2"><kbd>2</kbd>why</a>
+      <a href="#inside" data-key="3"><kbd>3</kbd>inside</a>
+      <a href="#manual" data-key="4"><kbd>4</kbd>manual</a>
+      <a href="#faq" data-key="5"><kbd>5</kbd>faq</a>
+      <a class="out" href="https://github.com/emptyenemy/asm">github</a>
     </nav>
   </div>
 </header>
 
-<main id="top">
-  <div class="wrap hero">
-    <h1>The AIR SDK Manager, in your terminal.</h1>
-    <p class="lede">Install, update, and remove AIR SDK builds on Windows, macOS, and Linux. <strong>One native binary</strong> — no Go, no PowerShell, no runtime to install first.</p>
+<main id="main">
+  <div class="hero" id="top">
+    <pre class="field" aria-hidden="true"></pre>
+    <div class="col">
+      <h1 class="banner"><span class="sr">asm</span><span aria-hidden="true">  ____ __________ ___
+ / __ `/ ___/ __ `__ \
+/ /_/ (__  ) / / / / /
+\__,_/____/_/ /_/ /_/</span></h1>
+      <p class="tagline">AIR SDK versions, managed from your terminal.</p>
+      <p class="lede">Find, install, update and remove AIR SDK builds on Windows, macOS and Linux. One native binary that works with the settings AIR SDK Manager already keeps.</p>
 
-    <div class="install" id="install">
-      <div class="tabs" role="tablist" aria-label="Install command for your platform">
-        <button class="tab" role="tab" id="tab-pwsh" aria-controls="panel-pwsh" aria-selected="true">Windows</button>
-        <button class="tab" role="tab" id="tab-sh" aria-controls="panel-sh" aria-selected="false">macOS, Linux</button>
-      </div>
-      <div id="panel-pwsh" role="tabpanel" aria-labelledby="tab-pwsh">
-        <div class="cmd">
-          <code id="line-pwsh">irm https://raw.githubusercontent.com/emptyenemy/asm/main/install.ps1 | iex</code>
-          <button class="copy" data-target="line-pwsh">COPY</button>
+      <section class="pane" id="install" aria-labelledby="install-title">
+        <h2 class="pane-title" id="install-title">install</h2>
+        <div class="tabs" role="tablist" aria-label="Your operating system">
+          <button role="tab" id="tab-windows" data-os="windows" aria-controls="install-panel" aria-selected="true">windows</button>
+          <button role="tab" id="tab-macos" data-os="macos" aria-controls="install-panel" aria-selected="false" tabindex="-1">macos</button>
+          <button role="tab" id="tab-linux" data-os="linux" aria-controls="install-panel" aria-selected="false" tabindex="-1">linux</button>
         </div>
-        <p class="note">The installer verifies the download against the release's <code class="mono">SHA256SUMS</code>, adds the binary to your user <code class="mono">PATH</code>, and refuses to overwrite an unrelated command called <code class="mono">asm</code>. Add <kbd>-NoPath</kbd> to keep your shell configuration untouched.</p>
-      </div>
-      <div id="panel-sh" role="tabpanel" aria-labelledby="tab-sh" hidden>
-        <div class="cmd">
-          <code id="line-sh">curl -fsSL https://raw.githubusercontent.com/emptyenemy/asm/main/install.sh | sh</code>
-          <button class="copy" data-target="line-sh">COPY</button>
+        <div id="install-panel" role="tabpanel" aria-labelledby="tab-windows">
+          <div class="cmd" data-for="windows">
+            <span class="prompt" aria-hidden="true">PS&gt;</span>
+            <code id="cmd-windows">irm https://raw.githubusercontent.com/emptyenemy/asm/main/install.ps1 | iex</code>
+            <button class="copy" data-copy="cmd-windows">copy</button>
+          </div>
+          <p class="hint" data-for="windows">Puts <code>asm.exe</code> in <code>%LOCALAPPDATA%\Programs\asm</code> and adds it to your user <code>PATH</code>, no admin rights needed. To leave <code>PATH</code> alone, download <a href="https://raw.githubusercontent.com/emptyenemy/asm/main/install.ps1">install.ps1</a> and run it with <code>-NoPath</code>.</p>
+          <div class="cmd" data-for="unix">
+            <span class="prompt" aria-hidden="true">$</span>
+            <code id="cmd-unix">curl -fsSL https://raw.githubusercontent.com/emptyenemy/asm/main/install.sh | sh</code>
+            <button class="copy" data-copy="cmd-unix">copy</button>
+          </div>
+          <p class="hint" data-for="unix">Puts <code>asm</code> in <code>~/.local/bin</code> and adds it to the profile of your shell. To leave the profile alone, pipe into <code>ASM_NO_PATH=1 sh</code> instead.</p>
+          <p class="hint">Both installers check the download against the release's <code>SHA256SUMS</code> and stop rather than overwrite an unrelated command called <code>asm</code>.</p>
         </div>
-        <p class="note">The installer verifies the download against the release's <code class="mono">SHA256SUMS</code> and adds <code class="mono">~/.local/bin</code> to the profile of the shell it detects. Add <kbd>ASM_NO_PATH=1</kbd> to keep your shell configuration untouched.</p>
-      </div>
+      </section>
+
+      <figure class="term" aria-labelledby="term-caption">
+        <div class="term-bar">
+          <span class="term-name" id="term-shell">PowerShell</span>
+          <span class="term-speed" id="term-speed">sped-up replay</span>
+          <button class="term-replay" id="term-replay" hidden>replay</button>
+        </div>
+        <pre class="term-screen" id="term-screen" aria-hidden="true"></pre>
+        <figcaption class="sr" id="term-caption">A recorded asm session. asm update finds 51.3.4.3 for an installed 51.3.4.1 and announces 51.4.1.1. asm install 51.4 downloads 51.4.1.1 with a progress bar, extracts and configures it. asm list then shows both SDKs and their paths.</figcaption>
+      </figure>
     </div>
-
-    <figure class="shot">
-      <img src="asm-help.png" width="1115" height="575" alt="Running asm in Windows Terminal: the asm banner, AIR SDK Manager 1.0.0, the usage line, and the command list with list, search, install, update, uninstall, clean and help.">
-      <figcaption>asm with no arguments lists what it can do.</figcaption>
-    </figure>
   </div>
 
-  <section id="why">
-    <div class="wrap">
-      <h2>What it saves you</h2>
-      <div class="grid">
-        <div class="item">
-          <h3>Nothing to install around it</h3>
-          <p>A single executable. No package manager, no runtime, no admin rights: the installer writes to your user directory and your user <code>PATH</code>.</p>
+  <section class="sect" id="why" aria-labelledby="why-title">
+    <div class="col">
+      <h2 class="rule" id="why-title">why asm</h2>
+      <dl class="opts">
+        <div><dt>one binary</dt><dd>No runtime, no package manager, no admin rights. Download one file and run it.</dd></div>
+        <div><dt>your settings</dt><dd>Reads <code>~/.airsdk/airsdkmanager.cfg</code>, the file AIR SDK Manager writes. Your SDK folder stays where it is, and the manager's files are never rewritten.</dd></div>
+        <div><dt>short versions</dt><dd><code>asm install 51.4</code> picks the newest stable build of that branch. An exact build such as <code>51.4.1.1</code> or <code>latest</code> works too.</dd></div>
+        <div><dt>resumable</dt><dd>A dropped connection is not a lost download. The next attempt, or the next run, continues from the bytes already on disk.</dd></div>
+        <div><dt>verified</dt><dd>Every archive is checked against its published size and SHA-256 before a single file is unpacked.</dd></div>
+        <div><dt>three sources</dt><dd>When the official API does not answer, asm falls back to the announcement archive and the shockpkg mirror, and says which one it used.</dd></div>
+        <div><dt>safe updates</dt><dd>An update keeps the old SDK until the new one is in place, then carries over <code>adt.cfg</code> and <code>adt.lic</code>. Paths in your tools stay valid.</dd></div>
+        <div><dt>recoverable</dt><dd>Closed the terminal mid-install? <code>asm clean</code> finds what was left behind and puts a half-replaced SDK back.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="sect" id="inside" aria-labelledby="inside-title">
+    <div class="col">
+      <h2 class="rule" id="inside-title">what asm install 51.4 does</h2>
+      <ol class="tree">
+        <li><b>resolve</b><span><code>51.4</code> becomes <code>51.4.1.1</code>, the newest stable build in that branch. Previews and betas are skipped.</span></li>
+        <li><b>catalog</b><span>The official AIR SDK API first. If it fails, the airsdk.dev announcement archive, then the catalog AIR SDK Manager saved on disk.</span></li>
+        <li><b>download</b><span>The official archives first, the shockpkg mirror if they fail. Bytes land in <code>.asm-partial</code>, named after the expected SHA-256. Four attempts with 1, 2 and 4 second pauses, and a stalled transfer is cut after 30 seconds.</span></li>
+        <li><b>verify</b><span>Size and SHA-256 must match before anything is unpacked. A file that fails is deleted, not retried as-is.</span></li>
+        <li><b>extract</b><span>Every path is checked to stay inside the SDK folder. Executable bits and safe symbolic links are kept on macOS and Linux.</span></li>
+        <li><b>configure</b><span>Linux runs <code>configure_linux.sh</code>. macOS loses the quarantine flag, without asking for an administrator password.</span></li>
+        <li><b>move</b><span>The finished SDK was built in a hidden staging folder. One rename makes it <code>AIRSDK_51.4.1.1</code>, so a half-written SDK never looks installed.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="sect" id="manual" aria-labelledby="manual-title">
+    <div class="col">
+      <h2 class="sr" id="manual-title">Manual</h2>
+      <div class="man">
+        <p class="man-head"><span>asm(1)</span><span>AIR SDK Manager</span><span>asm(1)</span></p>
+
+        <h3>NAME</h3>
+        <p class="ind">asm, a command-line version manager for AIR SDK</p>
+
+        <h3>SYNOPSIS</h3>
+        <p class="ind"><b>asm</b> &lt;command&gt; [VERSION] [options]</p>
+        <p class="ind">Square brackets mark a value you supply; type it without the brackets. <b>install</b> and <b>uninstall</b> need a version, the other commands take one optionally.</p>
+
+        <h3>COMMANDS</h3>
+        <dl class="ind cmds">
+          <dt><b>list</b>, <b>ls</b></dt><dd>List installed SDKs and their paths, newest first.</dd>
+          <dt><b>search</b> [VERSION]</dt><dd>List stable releases. <i>51.4</i> narrows to a branch.</dd>
+          <dt><b>install</b> [VERSION]</dt><dd>Install a branch such as <i>51.4</i>, an exact build, or <i>latest</i>.</dd>
+          <dt><b>update</b> [VERSION]</dt><dd>Show newer builds of installed SDKs. With a version or <i>--all</i>, install them. <i>--check</i> only previews.</dd>
+          <dt><b>uninstall</b> [VERSION]</dt><dd>Remove one installed SDK. Alias: <b>remove</b>.</dd>
+          <dt><b>clean</b></dt><dd>Remove what an interrupted run left behind. <i>--check</i> only reports.</dd>
+          <dt><b>help</b> [COMMAND]</dt><dd>Show help for asm or one command. <i>asm install --help</i> works too.</dd>
+        </dl>
+
+        <h3>OPTIONS</h3>
+        <dl class="ind cmds">
+          <dt><b>--accept-license</b></dt><dd>Accept the AIR SDK license for this <b>install</b> or <b>update</b> only. Nothing is written to disk.</dd>
+          <dt><b>--version</b>, <b>-v</b></dt><dd>Print the asm version.</dd>
+        </dl>
+
+        <h3>FILES</h3>
+        <div class="ind">
+          <p><code>~/.airsdk/airsdkmanager.cfg</code>, the AIR SDK Manager settings. <code>%USERPROFILE%</code> stands for <code>~</code> on Windows.</p>
+<pre class="cfg"><span class="k">AIR_SDKS</span>=C:\AIRSDK              <span class="c"># where SDKs are installed</span>
+<span class="k">HAS_ACCEPTED_LICENSE</span>=true       <span class="c"># or --accept-license per run</span></pre>
         </div>
-        <div class="item">
-          <h3>It uses the settings you already have</h3>
-          <p>Reads <code>~/.airsdk/airsdkmanager.cfg</code> from the AIR SDK Manager and never rewrites your settings or its database. Your SDK folder stays where it is.</p>
-        </div>
-        <div class="item">
-          <h3>A dropped connection is not a lost download</h3>
-          <p>The transfer resumes from the bytes already on disk and retries with a backoff, and every archive is checked against its published SHA-256 before it is unpacked.</p>
-        </div>
-        <div class="item">
-          <h3>Recovery after a hard kill</h3>
-          <p>Close the terminal mid-install and something is left behind. <code>asm clean</code> finds it, puts a half-replaced SDK back, and reports what it freed.</p>
-        </div>
+
+        <h3>ENVIRONMENT</h3>
+        <p class="ind"><code>NO_COLOR</code> turns colors off. <code>TERM=dumb</code> or redirected output also drops the animation, and search results become one version per line.</p>
+
+        <h3>EXIT STATUS</h3>
+        <p class="ind"><code>0</code> on success, including "nothing to update". <code>1</code> on any error, with the reason on stderr.</p>
+
+        <h3>EXAMPLES</h3>
+<pre class="ind ex"><span class="c"># the newest stable 51.4 build</span>
+asm install 51.4
+<span class="c"># see what would change, then apply it</span>
+asm update --all --check
+asm update --all</pre>
+        <p class="man-head"><span>asm 1.0.0</span><span>MIT</span><span>asm(1)</span></p>
       </div>
     </div>
   </section>
 
-  <section id="commands">
-    <div class="wrap">
-      <h2>Commands</h2>
-      <div class="cmds">
-        <code>asm search [VERSION]</code><span>List announced stable releases, newest first.</span>
-        <code>asm install [VERSION]</code><span>Install a branch such as <em>51.4</em>, an exact build, or <em>latest</em>.</span>
-        <code>asm list</code><span>List installed SDKs and their absolute paths. Alias: <em>ls</em>.</span>
-        <code>asm update [VERSION]</code><span>Update installed SDKs. <em>--check</em> previews, <em>--all</em> covers every one.</span>
-        <code>asm uninstall [VERSION]</code><span>Remove one installed SDK. Alias: <em>remove</em>.</span>
-        <code>asm clean</code><span>Remove what an interrupted operation left behind. <em>--check</em> only reports.</span>
+  <section class="sect" id="faq" aria-labelledby="faq-title">
+    <div class="col">
+      <h2 class="rule" id="faq-title">questions</h2>
+      <div class="faq">
+        <details>
+          <summary>Do I need AIR SDK Manager installed?</summary>
+          <p>No, only its settings file. Create <code>~/.airsdk/airsdkmanager.cfg</code> with an <code>AIR_SDKS</code> line pointing at the folder for your SDKs, and asm takes it from there.</p>
+        </details>
+        <details>
+          <summary>Does asm switch the SDK my project uses?</summary>
+          <p>No. It installs, updates and removes SDKs, and leaves <code>PATH</code>, <code>AIR_HOME</code> and your IDE alone. Point them at the path asm prints. An update keeps that path, so they stay valid.</p>
+        </details>
+        <details>
+          <summary>What happens if the download breaks?</summary>
+          <p>asm retries with growing pauses and continues from the bytes it already has. If it still fails, the partial file waits in <code>.asm-partial</code> inside your SDK folder, and the next <code>asm install</code> picks it up. Leftovers older than seven days are removed.</p>
+        </details>
+        <details>
+          <summary>Does it work on Windows on ARM?</summary>
+          <p>No. There is no native Windows ARM64 AIR SDK, so the installer stops with that message. Windows x64, macOS on Intel and Apple Silicon, and Linux x64 and ARM64 are supported.</p>
+        </details>
+        <details>
+          <summary>Is this an official HARMAN tool?</summary>
+          <p>No. asm is an independent, MIT-licensed project. The AIR SDK is a separate product licensed by HARMAN, and asm downloads it only after you accept that license.</p>
+        </details>
+        <details>
+          <summary>Has it been tested against the real download service?</summary>
+          <p>The commands, the settings handling and SDK assembly are covered by tests on all five builds. Downloading a real SDK from the live service has not been verified on every host yet. If something breaks, <a href="https://github.com/emptyenemy/asm/issues">open an issue</a> with the command and its output.</p>
+        </details>
       </div>
-      <p class="note">Square brackets mark a value you supply. <code class="mono">asm help COMMAND</code> explains any of them, and <code class="mono">asm install --help</code> works too.</p>
-    </div>
-  </section>
-
-  <section id="config">
-    <div class="wrap">
-      <h2>Configuration</h2>
-      <p>asm reads the same file the AIR SDK Manager writes. Point <code class="mono">AIR_SDKS</code> at the folder that holds your SDKs, and record that you have accepted the AIR SDK license.</p>
-      <pre><span class="c"># ~/.airsdk/airsdkmanager.cfg</span>
-<span class="k">AIR_SDKS</span>=C:\AIRSDK
-<span class="k">HAS_ACCEPTED_LICENSE</span>=true</pre>
-      <p>Without that setting, pass <code class="mono">--accept-license</code> to a single <code class="mono">install</code> or <code class="mono">update</code>. The flag applies to that operation only and changes nothing on disk.</p>
-    </div>
-  </section>
-
-  <section id="limits">
-    <div class="wrap">
-      <h2>What it will not do</h2>
-      <ul class="plain">
-        <li><strong>Windows on ARM is not supported.</strong> There is no native Windows ARM64 AIR SDK, so the installer stops with that message instead of installing a build that could not install an SDK.</li>
-        <li><strong>Installing an SDK needs an accepted AIR SDK license.</strong> asm manages AIR SDKs; the SDK itself is licensed by HARMAN.</li>
-        <li><strong>Downloading a real SDK has not been verified on every host yet.</strong> The command set, the configuration handling and the assembly of an SDK are covered by fixture tests, but the live service is a separate question — please report what breaks.</li>
-      </ul>
     </div>
   </section>
 </main>
 
-<footer>
-  <div class="wrap foot">
-    <span>MIT licensed · <a href="https://github.com/emptyenemy/asm/blob/main/LICENSE">LICENSE</a></span>
-    <span>
-      <a href="https://github.com/emptyenemy/asm">Source</a> ·
-      <a href="https://github.com/emptyenemy/asm/issues">Issues</a> ·
-      <a href="https://github.com/emptyenemy/asm/releases">Releases</a>
-    </span>
+<footer class="status">
+  <div class="col status-inner">
+    <span class="seg on">asm 1.0.0</span>
+    <span class="seg">MIT</span>
+    <span class="seg grow">An independent project. AIR SDK is licensed by HARMAN.</span>
+    <a class="seg" href="https://github.com/emptyenemy/asm">source</a>
+    <a class="seg" href="https://github.com/emptyenemy/asm/issues">issues</a>
+    <a class="seg" href="https://github.com/emptyenemy/asm/releases">releases</a>
   </div>
 </footer>
 
 <script src="app.js" defer></script>
+<script src="demo.js" defer></script>
 </body>
 </html>
