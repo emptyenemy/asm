@@ -75,7 +75,9 @@ jobs:
           fi
           python=python3
           if [ "$TARGET_OS" = windows ]; then python=python; fi
-          ARCHIVE="$archive" "$python" -c 'import hashlib, os, pathlib; p = pathlib.Path("dist") / os.environ["ARCHIVE"]; (pathlib.Path("dist") / (p.name + ".sha256")).write_text(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n")'
+          # write_bytes, not write_text: on Windows write_text turns the LF into
+          # CRLF, and one CRLF line breaks sha256sum -c on the combined file.
+          ARCHIVE="$archive" "$python" -c 'import hashlib, os, pathlib; p = pathlib.Path("dist") / os.environ["ARCHIVE"]; (pathlib.Path("dist") / (p.name + ".sha256")).write_bytes((hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n").encode())'
       - name: Check the bootstrap installer
         shell: bash
         env:
