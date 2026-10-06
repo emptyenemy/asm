@@ -30,7 +30,7 @@ func (r *sweep) remove(path string, check bool) error {
 
 func (r *sweep) report(a *app, check bool) {
 	if len(r.removed) == 0 && len(r.restored) == 0 {
-		a.ui.line("Nothing to clean.", "")
+		a.ui.say("Nothing to clean.", "")
 		return
 	}
 	removed, restored, freed := "Removed", "Restored", "Freed"
@@ -38,13 +38,13 @@ func (r *sweep) report(a *app, check bool) {
 		removed, restored, freed = "Would remove", "Would restore", "Would free"
 	}
 	for _, name := range r.removed {
-		a.ui.line(removed+" "+name, "")
+		a.ui.pair(removed, name)
 	}
 	for _, name := range r.restored {
-		a.ui.line(restored+" "+name, "")
+		a.ui.pair(restored, name)
 	}
 	if r.freed > 0 {
-		a.ui.line(freed+" "+formatBytes(float64(r.freed)), "")
+		a.ui.say(freed+" "+formatBytes(float64(r.freed)), "accent")
 	}
 }
 
@@ -77,7 +77,7 @@ func (a *app) clean(check bool) error {
 		return err
 	}
 	if !occupied(root) {
-		a.ui.line("Nothing to clean.", "")
+		a.ui.say("Nothing to clean.", "")
 		return nil
 	}
 	unlock, err := lockSDKRoot(root)

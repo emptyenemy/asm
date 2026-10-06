@@ -34,9 +34,10 @@
   function repeat(text, count) { return new Array(Math.max(0, count) + 1).join(text); }
   function padEnd(text, width) { return text + repeat(' ', width - text.length); }
 
-  function wrapLines(text, indent, cls) {
-    var width = Math.max(1, cols - indent - 1);
-    var pad = repeat(' ', indent);
+  // wrapText and breakText split text the way the CLI does: prose at a
+  // space, values such as paths wherever the line ends.
+  function wrapText(text, width) {
+    width = Math.max(1, width);
     var runes = Array.from(text);
     var out = [];
     while (runes.length > width) {
@@ -44,11 +45,30 @@
       for (var i = width; i > 0; i--) {
         if (runes[i] === ' ') { end = i; break; }
       }
-      out.push([seg(pad + runes.slice(0, end).join(''), cls)]);
+      out.push(runes.slice(0, end).join(''));
       runes = Array.from(runes.slice(end).join('').replace(/^ +/, ''));
     }
-    out.push([seg(pad + runes.join(''), cls)]);
+    out.push(runes.join(''));
     return out;
+  }
+
+  function breakText(text, width) {
+    width = Math.max(1, width);
+    var runes = Array.from(text);
+    var out = [];
+    while (runes.length > width) {
+      out.push(runes.slice(0, width).join(''));
+      runes = runes.slice(width);
+    }
+    out.push(runes.join(''));
+    return out;
+  }
+
+  function wrapLines(text, indent, cls) {
+    var pad = repeat(' ', indent);
+    return wrapText(text, cols - indent - 1).map(function (line) {
+      return [seg(pad + line, cls)];
+    });
   }
 
   function add(render) {
@@ -63,7 +83,17 @@
   function text(value, cls) { add(function () { return [[seg(value, cls)]]; }); }
   function blank() { text(''); }
   function wrapped(value, indent, cls) { add(function () { return wrapLines(value, indent, cls); }); }
-  function heading(value) { blank(); wrapped(value, 2, 'a'); blank(); }
+
+  // A muted label followed by its text, as in "Install: asm install 51.4".
+  function labeled(label, value, cls, hard) {
+    add(function () {
+      var split = hard ? breakText : wrapText;
+      return split(label + ' ' + value, cols - 5).map(function (line, i) {
+        if (i > 0) return [seg('    '), seg(line, cls)];
+        return [seg('  '), seg(label, 'm'), seg(line.slice(label.length), cls)];
+      });
+    });
+  }
 
   function table(headers, rows) {
     add(function () {
@@ -77,10 +107,10 @@
       }
       var out = [];
       if (cols - prefix < 18) {
-        rows.forEach(function (row) {
+        rows.forEach(function (row, n) {
+          if (n > 0) out.push([seg('')]);
           out = out.concat(wrapLines(row.slice(0, columns).join(' -> '), 2, 'a'));
-          out = out.concat(wrapLines(row[columns], 4, 'm'));
-          out.push([seg('')]);
+          out = out.concat(wrapLines(row[columns], 4, ''));
         });
         return out;
       }
@@ -282,42 +312,53 @@
     var current = host.root + 'AIRSDK_51.3.4.1';
     var fresh = host.root + 'AIRSDK_51.4.1.1';
     entries = [];
+    // Every answer opens and closes with a blank line; a spinner draws on
+    // the first line of the answer until the result replaces it.
     return pause(stamp, 0)
       .then(function () { return type(stamp, 'asm update'); })
-      .then(function () { return spinner(stamp, 'Checking AIR SDK releases', 900, 1); })
       .then(function () {
-        heading('Available updates');
+        blank();
+        return spinner(stamp, 'Checking AIR SDK releases', 900, 1);
+      })
+      .then(function () {
+        wrapped('Available updates', 2, 'a');
+        blank();
         table(['Installed', 'Available', 'Path'], [['51.3.4.1', '51.3.4.3', current]]);
         blank();
-        text('New AIR SDK available: 51.4.1.1', 'a');
-        text('Install: asm install 51.4');
+        wrapped('New AIR SDK available: 51.4.1.1', 2, 'a');
+        labeled('Install:', 'asm install 51.4', 'a', false);
         blank();
-        wrapped('Apply: asm update --all', 2, 'a');
+        labeled('Apply:', 'asm update --all', 'a', false);
         blank();
         return pause(stamp, 2200);
       })
       .then(function () { return type(stamp, 'asm install 51.4'); })
-      .then(function () { return spinner(stamp, 'Checking AIR SDK releases', 800, 1); })
       .then(function () {
-        heading('Install AIR SDK 51.4.1.1');
-        text('Destination: ' + fresh, 'm');
+        blank();
+        return spinner(stamp, 'Checking AIR SDK releases', 800, 1);
+      })
+      .then(function () {
+        wrapped('Install AIR SDK 51.4.1.1', 2, 'a');
+        blank();
+        labeled('Destination:', fresh, '', true);
         return spinner(stamp, 'Loading the SDK manifest', 600, 1);
       })
       .then(function () {
-        text('Downloading AIR SDK 51.4.1.1', 'm');
+        wrapped('Downloading AIR SDK 51.4.1.1', 2, 'm');
         return download(stamp, host.size);
       })
       .then(function () { return spinner(stamp, 'Extracting the SDK', 1700, SPEED); })
       .then(function () { return spinner(stamp, 'Configuring the SDK', os === 'linux' ? 900 : 300, 1); })
       .then(function () {
-        text('Installed AIR SDK 51.4.1.1', 'a');
-        text('Path: ' + fresh, 'm');
+        wrapped('Installed AIR SDK 51.4.1.1', 2, 'a');
         blank();
         return pause(stamp, 1600);
       })
       .then(function () { return type(stamp, 'asm list'); })
       .then(function () {
-        heading('Installed AIR SDKs');
+        blank();
+        wrapped('Installed AIR SDKs', 2, 'a');
+        blank();
         table(['Version', 'Path'], [['51.4.1.1', fresh], ['51.3.4.1', current]]);
         blank();
         add(function () { return [[seg(hosts[os].prompt, 'p'), seg(' ', 'caret')]]; });

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/emptyenemy/asm/internal/cli"
@@ -10,8 +9,7 @@ import (
 var version = "1.0.0"
 
 func main() {
-	if err := cli.Run(os.Args[1:], version); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
+	if cli.Run(os.Args[1:], version) != nil {
 		os.Exit(1)
 	}
 }

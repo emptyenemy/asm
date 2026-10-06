@@ -366,9 +366,11 @@ saved SDK whose description cannot be read is reported and left in place.
 
 <br>
 
-In an interactive terminal asm uses an indigo accent (`#818CF8`), aligned
-version and path columns, and a suggestion for the next command. Narrow
-terminals get stacked entries and wrapped paths. Requests show a spinner;
+In an interactive terminal every answer sits between two blank lines, indented
+by two columns. The indigo accent (`#818CF8`) marks headings, versions, results
+and the command to run next; labels and side notes are muted, and warnings and
+errors are marked in amber and red. Versions and paths line up in columns, and
+narrow terminals get stacked entries and wrapped paths. Requests show a spinner;
 downloads show a bar with the bytes transferred, the percentage when the size
 is known, and the average speed. Progress goes to stderr and is cleared when it
 finishes.

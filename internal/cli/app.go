@@ -308,7 +308,7 @@ func (a *app) run(args []string) error {
 		}
 		a.ui.heading("Installed AIR SDKs")
 		if len(sdks) == 0 {
-			a.ui.line("No local AIR SDK versions found.", "")
+			a.ui.say("No local AIR SDK versions found.", "")
 			return nil
 		}
 		var rows [][]string
@@ -340,19 +340,15 @@ func (a *app) run(args []string) error {
 			}
 		}
 		if len(matches) == 0 {
-			a.ui.line("No matching AIR SDK versions found.", "")
+			a.ui.say("No matching AIR SDK versions found.", "")
 			return nil
 		}
 		for _, v := range matches {
-			prefix := ""
-			if a.ui.interactive {
-				prefix = "  "
-			}
-			a.ui.line(prefix+v.String(), "accent")
+			a.ui.say(v.String(), "accent")
 		}
 		if a.ui.interactive {
-			a.ui.line("", "")
-			a.ui.wrap("Install: asm install "+matches[0].String(), 2, "muted")
+			a.ui.gap()
+			a.ui.hint("Install:", "asm install "+matches[0].String())
 		}
 	case "clean":
 		o, err := parseOptions(command, rest)
@@ -385,9 +381,22 @@ var htmlTags = regexp.MustCompile(`<[^>]*>`)
 var newsNumber = regexp.MustCompile(`(?i)\bRelease\s+(\d+\.\d+\.\d+\.\d+)\b`)
 var previewTitle = regexp.MustCompile(`(?i)\b(beta|alpha|preview|pre[ -]?release)\b`)
 
-// Run executes the CLI with the supplied arguments and build version.
+// finish reports how a run ended: the error that stopped it, or the blank
+// line that closes an interactive answer.
+func (a *app) finish(err error) error {
+	if err != nil {
+		a.ui.failure(err)
+	} else {
+		a.ui.close()
+	}
+	return err
+}
+
+// Run executes the CLI with the supplied arguments and build version. An
+// error is reported on stderr before it is returned.
 func Run(args []string, version string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	return newApp(ctx, newTerminal(os.Stdout, os.Stderr), version).run(args)
+	a := newApp(ctx, newTerminal(os.Stdout, os.Stderr), version)
+	return a.finish(a.run(args))
 }

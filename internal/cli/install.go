@@ -206,14 +206,14 @@ func (a *app) uninstall(request string) error {
 		return err
 	}
 	a.ui.heading("Uninstall AIR SDK " + sdk.Version.String())
-	a.ui.line("Path: "+path, "muted")
+	a.ui.pair("Path:", path)
 	stop := a.ui.activity("Removing AIR SDK "+sdk.Version.String(), nil)
 	err = removeChild(root, path)
 	stop()
 	if err != nil {
 		return fmt.Errorf("cannot completely remove SDK at %s: %w", path, err)
 	}
-	a.ui.line("Uninstalled AIR SDK "+sdk.Version.String(), "accent")
+	a.ui.say("Uninstalled AIR SDK "+sdk.Version.String(), "accent")
 	return nil
 }
 
@@ -270,7 +270,7 @@ func (a *app) install(o options) error {
 		}
 		for _, sdk := range sdks {
 			if sdk.Version == v {
-				a.ui.line(fmt.Sprintf("AIR SDK %s is already installed at %s", v, sdk.Path), "")
+				a.reportInstalled(sdk)
 				return nil
 			}
 		}
@@ -296,7 +296,7 @@ func (a *app) install(o options) error {
 	}
 	for _, sdk := range sdks {
 		if sdk.Version == v {
-			a.ui.line(fmt.Sprintf("AIR SDK %s is already installed at %s", v, sdk.Path), "")
+			a.reportInstalled(sdk)
 			return nil
 		}
 	}
@@ -309,7 +309,7 @@ func (a *app) install(o options) error {
 	}
 	defer removeChild(root, stage)
 	a.ui.heading("Install AIR SDK " + v.String())
-	a.ui.line("Destination: "+destination, "muted")
+	a.ui.pair("Destination:", destination)
 	if err := a.buildSDK(v, stage); err != nil {
 		return err
 	}
@@ -322,9 +322,14 @@ func (a *app) install(o options) error {
 	if err := moveNewDirectory(stage, destination); err != nil {
 		return err
 	}
-	a.ui.line("Installed AIR SDK "+v.String(), "accent")
-	a.ui.line("Path: "+destination, "muted")
+	a.ui.say("Installed AIR SDK "+v.String(), "accent")
 	return nil
+}
+
+// reportInstalled answers an install of a build that is already in place.
+func (a *app) reportInstalled(sdk installedSDK) {
+	a.ui.say(fmt.Sprintf("AIR SDK %s is already installed.", sdk.Version), "accent")
+	a.ui.pair("Path:", sdk.Path)
 }
 
 // replaceSDK builds the new version beside the installed one and keeps the old
@@ -352,6 +357,7 @@ func (a *app) replaceSDK(sdk installedSDK, v sdkVersion) error {
 		return err
 	}
 	defer removeChild(root, stage)
+	a.ui.gap()
 	if err := a.buildSDK(v, stage); err != nil {
 		return err
 	}
@@ -404,8 +410,8 @@ func (a *app) replaceSDK(sdk installedSDK, v sdkVersion) error {
 	if err := removeChild(root, previous); err != nil {
 		return fmt.Errorf("SDK updated, but cannot remove temporary old SDK at %s: %w", previous, err)
 	}
-	a.ui.line(fmt.Sprintf("Updated %s -> %s", sdk.Version, v), "accent")
-	a.ui.line("Path: "+current, "muted")
+	a.ui.say(fmt.Sprintf("Updated %s -> %s", sdk.Version, v), "accent")
+	a.ui.pair("Path:", current)
 	return nil
 }
 
@@ -457,9 +463,9 @@ func (a *app) update(o options) error {
 		a.ui.heading("Available updates")
 		a.ui.rows([]string{"Installed", "Available", "Path"}, rows)
 	} else if len(sdks) > 0 {
-		a.ui.line("Installed SDKs are up to date.", "")
+		a.ui.say("Installed SDKs are up to date.", "")
 	} else {
-		a.ui.line("No local AIR SDK versions found.", "")
+		a.ui.say("No local AIR SDK versions found.", "")
 	}
 	if o.filter == "" && len(versions) > 0 {
 		latest := versions[0]
@@ -470,9 +476,9 @@ func (a *app) update(o options) error {
 			}
 		}
 		if !branch && (len(sdks) == 0 || latest.newer(sdks[0].Version)) {
-			a.ui.line("", "")
-			a.ui.line("New AIR SDK available: "+latest.String(), "accent")
-			a.ui.line(fmt.Sprintf("Install: asm install %d.%d", latest[0], latest[1]), "")
+			a.ui.gap()
+			a.ui.say("New AIR SDK available: "+latest.String(), "accent")
+			a.ui.hint("Install:", fmt.Sprintf("asm install %d.%d", latest[0], latest[1]))
 		}
 	}
 	if len(updates) == 0 || o.check || (!o.all && o.filter == "") {
@@ -481,8 +487,8 @@ func (a *app) update(o options) error {
 			if action == "" {
 				action = "--all"
 			}
-			a.ui.line("", "")
-			a.ui.wrap("Apply: asm update "+action, 2, "accent")
+			a.ui.gap()
+			a.ui.hint("Apply:", "asm update "+action)
 		}
 		return nil
 	}
