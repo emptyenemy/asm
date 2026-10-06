@@ -535,7 +535,9 @@ is a starting point.
 
 ## Validation
 
-Run `go test ./...` and `go vet ./...`. Tests create small SDK/ZIP fixtures in
+Run `go test ./...` and `go vet ./...`. [CONTRIBUTING.md](CONTRIBUTING.md)
+describes the code layout and the steps for adding a command. Tests create
+small SDK/ZIP fixtures in
 temporary directories and use local HTTP servers. They exercise numeric
 versions, idempotent installation, spaces/Unicode, licenses, source failures,
 hashes, sizes, retries, stalled transfers, resumption across runs, source
