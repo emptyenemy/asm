@@ -5,16 +5,19 @@ releases, install a version, and update existing installations.
 
 ![asm help](assets/asm-help.png)
 
-Version **1.0.0 is in development**. There are no published releases yet.
-The implementation uses **Go** and its standard library. One native executable
-runs on Windows, macOS, or Linux without PowerShell or a Go installation.
+Version **1.0.0**. The implementation uses **Go** and its standard library. One
+native executable runs on Windows, macOS, or Linux without PowerShell or a Go
+installation.
+
+The command set, the configuration handling and the assembly of an SDK are
+covered by fixture tests. Downloading a real SDK from the live service has not
+been verified on every host yet.
 
 ## Getting started
 
 ### Install a published release
 
-These commands will work once the first release has been published. The
-installers select the native binary and verify it against the release's
+The installers select the native binary and verify it against the release's
 `SHA256SUMS` before installation.
 
 Windows PowerShell:

@@ -311,8 +311,7 @@ passes. The tag supplies the binary version, without the `v` prefix.
 Releases use the latest stable patch of Go 1.27; their OS minimums follow that
 toolchain. New dependencies should use their current stable versions.
 
-Version 1.0.0 is still being developed. No version tag or release has been
-published as part of this migration.
+Version 1.0.0 is tagged `v1.0.0`; its archives come from the workflow above.
 
 ## Current development plan
 
@@ -322,8 +321,8 @@ an official-API-first source chain with named fallbacks, and resumable
 downloads with backoff retries. Native builds, fixture tests, and release
 installers cover Windows amd64, macOS amd64/arm64, and Linux amd64/arm64.
 
-Before the first release, full SDK downloads and tool execution still need
-validation on each supported host. The
+Full SDK downloads and tool execution still need validation on each supported
+host. The
 [Linux SDK documentation](https://airsdk.dev/docs/basics/install/linux)
 explicitly supports x86_64 and ARM64; Linux SDK tools require a commercial
 AIR license. See also the
@@ -336,8 +335,7 @@ published releases and tags will be added only once that version is ready.
 ### Planned for 1.0.0
 
 No command beyond the current set is planned; the remaining work is validation
-rather than new features. A version tag is deliberately withheld until that
-validation passes.
+rather than new features.
 
 The command set is deliberately small: `list`, `search`, `install`, `update`,
 `uninstall`, and `clean`. SDK selection, running tools, and other extras are
