@@ -82,7 +82,7 @@ HAS_ACCEPTED_LICENSE=true
 
 asm reads `~/.airsdk/airsdkmanager.cfg`, using the current user's home directory
 on each OS (`%USERPROFILE%` on Windows). No directory argument is needed for
-each command. SDK discovery through `PATH` and additional saved roots are planned.
+each command.
 
 Downloading requires acceptance of the AIR SDK license: either
 `HAS_ACCEPTED_LICENSE=true` in the manager configuration, or `--accept-license`
@@ -284,10 +284,10 @@ otherwise fails, the error identifies the directory that needs attention.
 
 ## Downloads and cleanup
 
-`install` and `update` share SDK assembly logic. By default, asm downloads the
-full host OS archive with the compiler using shockpkg metadata and archive.org.
-An explicit `API_ENDPOINT` enables that API's manifest or an exact manifest
-from the manager database. Component recipes select `window`, `macos`, or
+`install` and `update` share SDK assembly logic. asm tries the official API
+manifest first and falls back to the full host archive with the compiler from
+the shockpkg metadata and archive.org. An explicit `API_ENDPOINT` replaces the
+official base. Component recipes select `window`, `macos`, or
 `linux` for the current host and retain common tools, Android, and iPhone
 components. Other desktop OS components are excluded.
 
@@ -301,16 +301,25 @@ present, without requesting administrator privileges. A compatible
 `air-sdk-description.xml` is generated before the installation is moved into
 place. Download or extraction failures leave existing SDKs untouched.
 
-Archives are deleted after extraction. Temporary directories, incomplete
-downloads, and the operation lock are removed on completion. An update
-temporarily renames the old SDK for rollback and deletes it after a successful
-replacement. Persistent `.asm-backups` and archive caches are not created.
-If rollback itself fails, the original files are retained and their location is
-included in the error.
+Archives are deleted after extraction. Temporary directories and the operation
+lock are removed on completion, and a canceled operation cleans up after
+itself. An update temporarily renames the old SDK for rollback and deletes it
+after a successful replacement. Persistent `.asm-backups` and archive caches
+are not created. If rollback itself fails, the original files are retained and
+their location is included in the error.
 
 Install and update share a lock for the SDK root. Another concurrent writer
-fails instead of changing the same SDKs. Catalog and manifest requests have a
-15-second timeout; a large archive download has a 600-second timeout.
+fails instead of changing the same SDKs. Official API requests have a 6-second
+timeout, the mirror and announcement requests 15 seconds, and each archive
+download attempt 600 seconds. A transfer that receives no data for 30 seconds
+is interrupted and retried.
+
+An interrupted download is kept in `AIR_SDKS/.asm-partial`, named after the
+expected SHA-256, and continues from the stored bytes on the next attempt or
+run: up to four attempts with 1, 2, and 4-second delays, then the remaining
+bytes are kept for a later run. `asm list` and `uninstall` ignore that
+directory. A verified download replaces the partial file; data that fails
+verification, and leftovers older than seven days, are deleted.
 
 ## Sources and fallback options
 
@@ -322,25 +331,26 @@ are retained for switching sources or revisiting an alternative.
 
 | Source | Use and limitations |
 | --- | --- |
-| [AIR SDK announcement archive](https://airsdk.dev/news/archive) | Current source for search, short-version resolution, and update checks. About 18 KB and one second in a probe. Newest release at the time was `51.4.1.1`, announced September 23, 2026. Unannounced builds may be absent. |
-| [HARMAN API](https://api.airsdk.harman.com/releases?types=production) | GUI's native catalog: a `releases` array with release types. A probe returned HTTP 200 containing `Sandbox.Timedout` after roughly ten seconds; a VPN did not fix the server error. Validate JSON, not only HTTP status. A future primary source once healthy. |
-| AIR SDK Manager database | Current fallback: `availableSDKs`, `latestSDKs`, and `installableSDKs`, each containing `build` metadata. Main database first, then newest usable backups. An existing local snapshot, not a guarantee of freshness. |
+| [HARMAN API](https://api.airsdk.harman.com/releases?types=production) | Default catalog: a `releases` array with release types. A probe returned HTTP 200 containing `Sandbox.Timedout` after roughly ten seconds; a VPN did not fix the server error. Validate JSON, not only HTTP status. asm tries it first and falls back on failure. |
+| [AIR SDK announcement archive](https://airsdk.dev/news/archive) | First fallback for search, short-version resolution, and update checks. About 18 KB and one second in a probe. Newest release at the time was `51.4.1.1`, announced September 23, 2026. Unannounced builds may be absent. |
+| AIR SDK Manager database | Last-resort fallback: `availableSDKs`, `latestSDKs`, and `installableSDKs`, each containing `build` metadata. Main database first, then newest usable backups. An existing local snapshot, not a guarantee of freshness. |
 | [RSS](https://airsdk.dev/news/rss.xml) and [Atom](https://airsdk.dev/news/atom.xml) | Investigated alternatives to HTML parsing, generally covering recent announcements rather than a complete history. Not used automatically. |
 | [News source repository](https://github.com/airsdk/airsdk.dev/tree/main/news) | Another way to obtain published announcements. GitHub API rate limits apply; unannounced builds remain absent. Not currently used. |
-| [shockpkg catalog](https://shockpkg.github.io/packages/api/1/packages.json) | More archives, including unannounced builds; approximately 3.9 MB in the inspected snapshot. No production/prerelease classification, so stable short-version resolution needs another source. Used for downloads. |
+| [shockpkg catalog](https://shockpkg.github.io/packages/api/1/packages.json) | More archives, including unannounced builds; approximately 3.9 MB in the inspected snapshot. No production/prerelease classification, so stable short-version resolution needs another source. Used as the fallback download source. |
 
-An explicit `API_ENDPOINT` in the manager configuration switches catalog
-requests to `GET <API_ENDPOINT>/releases?types=production`. Entries explicitly
-typed as non-production are excluded. On failure, the manager database remains
-the fallback. There is no `--source` command option yet.
+An explicit `API_ENDPOINT` in the manager configuration replaces the default
+`https://api.airsdk.harman.com` base for catalog and manifest requests. Entries
+explicitly typed as non-production are excluded. Catalog requests try the API,
+then the announcement archive, then the manager database; the warning names the
+source that answered.
 
 ### SDK download sources
 
 | Source | Use and findings |
 | --- | --- |
-| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON catalog](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Default recipe: `air-sdk-<full-version>-<windows\|mac\|linux>-compiler`, using `source`, `sha256`, and `size`. The `51.4.1.1` catalog contains all three host archives. A 32-byte probe of Windows SDK `51.3.4.3` returned HTTP 206 and a ZIP signature in 1.8 seconds. Hashes come from shockpkg. |
-| HARMAN components | Native manager recipe: `POST /releases/components/<name>/<component-version>` with form data `acceptedLicense=true`. Probes returned 403. Supported for an explicit endpoint with component metadata. |
-| HARMAN full archives | Fallback recipe: `urls.AIR_Win` with `url`, `checksum`, and `fileSize`. Relative URLs use `https://airsdk.harman.com`; that site's URLs receive `license=accepted`. A direct probe returned 403. |
+| HARMAN components | Default recipe: `POST /releases/components/<name>/<component-version>` with form data `acceptedLicense=true`. Probes returned 403. Used when the manifest lists `components`. |
+| HARMAN full archives | Recipe for a manifest that carries `urls.AIR_Win` with `url`, `checksum`, and `fileSize`. Relative URLs use `https://airsdk.harman.com`; that site's URLs receive `license=accepted`. A direct probe returned 403. |
+| [shockpkg packages](https://github.com/shockpkg/packages) → [JSON catalog](https://shockpkg.github.io/packages/api/1/packages.json) → archive.org | Fallback recipe when the official API fails at any step: `air-sdk-<full-version>-<windows\|mac\|linux>-compiler`, using `source`, `sha256`, and `size`. The `51.4.1.1` catalog contains all three host archives. A 32-byte probe of Windows SDK `51.3.4.3` returned HTTP 206 and a ZIP signature in 1.8 seconds. Hashes come from shockpkg. |
 | [HARMAN website API](https://airsdk.harman.com/download) | Investigated `/api/versions/release-notes`, `/api/config-settings/download`, and `/api/versions/<full-version>`. Probes exceeded 15 seconds, including requests with browser headers. Worth checking again if service availability changes. |
 
 `/releases/<full-version>`, `/releases/versions/<version>`, and
@@ -348,10 +358,12 @@ the fallback. There is no `--source` command option yet.
 responded quickly but provided string URLs without hashes, insufficient for
 the current verified installation recipe.
 
-Before switching back to the official API, verify the catalog, production
-classification, exact manifest, and an actual Windows component download.
-The mirror recipe remains an independent option. No private package server is
-required.
+asm now tries the official API first and falls back to the mirror recipe when
+the manifest or a component download fails, so a 403 on the components route
+still installs from the mirror. Verifying the live service against the catalog,
+production classification, exact manifest, and an actual Windows component
+download is still pending. The mirror recipe remains an independent option. No
+private package server is required.
 
 ## Researching AIR SDK Manager
 
@@ -397,8 +409,8 @@ claim that no such tool exists.
 **The command name `asm` is already used by unrelated projects**, including
 [Agent Skill Manager](https://github.com/luongnv89/asm) and
 [Assemble](https://getassemble.dev/docs/cli). It is not a globally unique name.
-The planned installer must detect conflicting commands before adding asm to
-`PATH` and avoid overwriting or silently shadowing another tool.
+The installers detect conflicting commands before adding asm to `PATH` and
+refuse to overwrite or silently shadow another tool.
 
 ### Package-manager conventions
 
@@ -410,7 +422,6 @@ The planned installer must detect conflicting commands before adding asm to
 | Update installed | `upgrade` | `upgrade`, alias `update` | `upgrade` | `update` |
 | Refresh catalog | `update` | `source update` | No separate `update` command listed | Automatic before search and update checks |
 | Remove | `remove` | `uninstall` | `uninstall` | `uninstall VERSION`, alias `remove` |
-| Details | `show` | `show` | `info` | Planned `show`, alias `info` |
 
 The chosen SDK-update name is `update`. Its default preview and `--all` behavior
 resemble [winget upgrade](https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade).
@@ -449,9 +460,10 @@ published as part of this migration.
 ## Current development plan
 
 The Go CLI implements the existing commands, `uninstall`/`remove`, terminal
-presentation, home-based configuration, host archive selection, and platform
-setup. Native builds, fixture tests, and release installers cover Windows
-amd64, macOS amd64/arm64, and Linux amd64/arm64.
+presentation, home-based configuration, host archive selection, platform setup,
+an official-API-first source chain with named fallbacks, and resumable
+downloads with backoff retries. Native builds, fixture tests, and release
+installers cover Windows amd64, macOS amd64/arm64, and Linux amd64/arm64.
 
 Before the first release, full SDK downloads and tool execution still need
 validation on each supported host. The
@@ -464,26 +476,15 @@ AIR license. See also the
 Each feature is committed separately. Development continues on `1.0.0`;
 published releases and tags will be added only once that version is ready.
 
-### Later capabilities
+### Planned for 1.0.0
 
-| Capability | Intended behavior |
-| --- | --- |
-| `show [VERSION]`, `info` | Display date, size, platform, and source. |
-| `path [VERSION]` | Print an installed or selected SDK path for IDEs and scripts. |
-| `use VERSION` | Save an exact build in the project's `.asm-version`. |
-| `use --global VERSION`, `current` | A user default and effective selection; storage location remains undecided. |
-| `exec [--sdk VERSION] -- TOOL [ARGS...]` | Run with the selected `AIR_HOME` and SDK `bin` in the child's environment, preserving arguments and exit status. |
-| `install` without a version | Install the exact build from the nearest `.asm-version`. |
+No command beyond the current set is planned; the remaining work is validation
+rather than new features. A version tag is deliberately withheld until that
+validation passes.
 
-Future selection order: `exec --sdk`, then the nearest project `.asm-version`,
-then the user default. Resolve short selections from installed SDKs and store
-the full number. A missing selected SDK is an error. Parent-shell environment
-changes need separate shell integration or shims.
-
-Additional roots, environment discovery, JSON output, resumable downloads, and
-limited retries follow the basic commands. Flex overlays, older Adobe SDKs,
-`doctor`, completion, and APM integration are later additions. License acceptance
-remains explicit.
+The command set is deliberately small: `list`, `search`, `install`, `update`,
+`uninstall`. SDK selection, running tools, and other extras are
+out of scope. License acceptance remains explicit.
 
 Go is the implementation language. Use its standard HTTP/ZIP support and keep
 the application small, adding layers only when a concrete feature needs them.
@@ -498,8 +499,9 @@ is a starting point.
 Run `go test ./...` and `go vet ./...`. Tests create small SDK/ZIP fixtures in
 temporary directories and use local HTTP servers. They exercise numeric
 versions, idempotent installation, spaces/Unicode, licenses, source failures,
-hashes, sizes, ZIP traversal, SDK structure, locking, occupied destinations,
 cleanup, configuration/license preservation, new-branch notifications, and
+hashes, sizes, retries, stalled transfers, resumption across runs, source
+fallback, ZIP traversal, SDK structure, locking, occupied destinations,
 uninstall ambiguity. Linux checks also cover architecture setup and legacy
 path corrections; Unix checks cover symbolic links. Test directories are
 removed automatically. Full SDK downloads and tools still need separate

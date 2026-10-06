@@ -3,8 +3,6 @@ package modules
 import (
 	"archive/zip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,14 +30,32 @@ type manifest struct {
 	URLs       map[string]archiveInfo `json:"urls"`
 }
 
+// endpoint returns the HARMAN API base: API_ENDPOINT from the manager
+// configuration, or the official service.
 func (a *app) endpoint() string {
 	if a.settings == nil {
 		_ = a.loadSettings()
 	}
-	return strings.TrimRight(a.settings["API_ENDPOINT"], "/")
+	if custom := strings.TrimRight(a.settings["API_ENDPOINT"], "/"); custom != "" {
+		return custom
+	}
+	return strings.TrimRight(a.apiURL, "/")
 }
 
+type httpError struct {
+	code            int
+	status, address string
+}
+
+func (e *httpError) Error() string { return fmt.Sprintf("HTTP %s from %s", e.status, e.address) }
+
 func (a *app) request(ctx context.Context, method, address string) (*http.Response, error) {
+	return a.send(ctx, method, address, -1)
+}
+
+// send performs a request. A negative offset marks a metadata request; a
+// non-negative one is an archive download that continues at that byte.
+func (a *app) send(ctx context.Context, method, address string, offset int64) (*http.Response, error) {
 	var body io.Reader
 	if method == "POST" {
 		body = strings.NewReader("acceptedLicense=true")
@@ -52,19 +68,25 @@ func (a *app) request(ctx context.Context, method, address string) (*http.Respon
 	if body != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
+	if offset >= 0 {
+		req.Header.Set("Accept-Encoding", "identity")
+	}
+	if offset > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+	}
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		response.Body.Close()
-		return nil, fmt.Errorf("HTTP %s from %s", response.Status, address)
+		return nil, &httpError{response.StatusCode, response.Status, address}
 	}
 	return response, nil
 }
 
-func (a *app) metadata(address, label string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+func (a *app) metadata(address, label string, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
 	stop := a.ui.activity(label, nil)
 	defer stop()
@@ -150,28 +172,29 @@ func releaseNumbers(builds []manifest) ([]sdkVersion, error) {
 	return result, nil
 }
 
-func (a *app) fetchReleases() ([]sdkVersion, error) {
-	if endpoint := a.endpoint(); endpoint != "" {
-		data, err := a.metadata(endpoint+"/releases?types=production", "Checking AIR SDK releases")
-		if err != nil {
-			return nil, err
-		}
-		var response struct {
-			ErrorType string     `json:"errorType"`
-			Releases  []manifest `json:"releases"`
-		}
-		if err := json.Unmarshal(data, &response); err != nil {
-			return nil, err
-		}
-		if response.ErrorType != "" {
-			return nil, fmt.Errorf("AIR SDK API returned %s", response.ErrorType)
-		}
-		if response.Releases == nil {
-			return nil, errors.New("AIR SDK API response has no releases array")
-		}
-		return releaseNumbers(response.Releases)
+func (a *app) fetchAPIReleases() ([]sdkVersion, error) {
+	data, err := a.metadata(a.endpoint()+"/releases?types=production", "Checking AIR SDK releases", a.apiTimeout)
+	if err != nil {
+		return nil, err
 	}
-	data, err := a.metadata(a.newsURL, "Checking AIR SDK releases")
+	var response struct {
+		ErrorType string     `json:"errorType"`
+		Releases  []manifest `json:"releases"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil {
+		return nil, err
+	}
+	if response.ErrorType != "" {
+		return nil, fmt.Errorf("server error %s", response.ErrorType)
+	}
+	if response.Releases == nil {
+		return nil, errors.New("response has no releases array")
+	}
+	return releaseNumbers(response.Releases)
+}
+
+func (a *app) fetchNewsReleases() ([]sdkVersion, error) {
+	data, err := a.metadata(a.newsURL, "Checking AIR SDK releases", 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -193,22 +216,38 @@ func (a *app) fetchReleases() ([]sdkVersion, error) {
 	return releaseNumbers(builds)
 }
 
+// releases reads the catalog from the official API, then from the
+// announcement archive, then from the AIR SDK Manager database.
 func (a *app) releases() ([]sdkVersion, error) {
-	versions, err := a.fetchReleases()
-	if err == nil {
-		return versions, nil
+	sources := []struct {
+		name  string
+		fetch func() ([]sdkVersion, error)
+	}{
+		{"AIR SDK API", a.fetchAPIReleases},
+		{"announcement archive", a.fetchNewsReleases},
 	}
-	if a.ctx.Err() != nil {
-		return nil, a.ctx.Err()
+	var failures []string
+	for _, source := range sources {
+		versions, err := source.fetch()
+		if err == nil {
+			if len(failures) > 0 {
+				a.ui.warning(fmt.Sprintf("%s. Using the %s.", strings.Join(failures, "; "), source.name))
+			}
+			return versions, nil
+		}
+		if a.ctx.Err() != nil {
+			return nil, a.ctx.Err()
+		}
+		failures = append(failures, fmt.Sprintf("%s failed: %v", source.name, err))
 	}
 	for _, file := range a.catalogFiles() {
 		cached, cacheErr := releaseNumbers(cachedBuilds(file))
 		if cacheErr == nil && len(cached) > 0 {
-			a.ui.warning(fmt.Sprintf("%v. Using cached AIR SDK Manager catalog: %s", err, file))
+			a.ui.warning(fmt.Sprintf("%s. Using cached AIR SDK Manager catalog: %s", strings.Join(failures, "; "), file))
 			return cached, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot load AIR SDK catalog: %w", err)
+	return nil, fmt.Errorf("cannot load AIR SDK catalog: %s", strings.Join(failures, "; "))
 }
 
 func (a *app) platform() (string, string, string, error) {
@@ -229,33 +268,40 @@ func (a *app) platform() (string, string, string, error) {
 	return "", "", "", fmt.Errorf("unsupported SDK host: %s/%s", a.os, a.arch)
 }
 
-func (a *app) sdkManifest(v sdkVersion) (manifest, error) {
+// apiManifest loads the build manifest, preferring one saved by AIR SDK Manager.
+func (a *app) apiManifest(v sdkVersion) (manifest, error) {
+	_, _, key, err := a.platform()
+	if err != nil {
+		return manifest{}, err
+	}
+	for _, file := range a.catalogFiles() {
+		for _, build := range cachedBuilds(file) {
+			if build.Name == v.String() && build.Type == "production" && (len(build.Components) > 0 || build.URLs[key].Checksum != "") {
+				return build, nil
+			}
+		}
+	}
+	data, err := a.metadata(a.endpoint()+"/releases/"+v.String()+"?types=production", "Loading the SDK manifest", a.apiTimeout)
+	if err != nil {
+		return manifest{}, err
+	}
+	var build manifest
+	if err := json.Unmarshal(data, &build); err != nil {
+		return build, err
+	}
+	if build.Name != v.String() || build.Type != "production" {
+		return build, fmt.Errorf("invalid manifest for AIR SDK %s", v)
+	}
+	return build, nil
+}
+
+// mirrorManifest describes the full host archive from the shockpkg catalog.
+func (a *app) mirrorManifest(v sdkVersion) (manifest, error) {
 	mirrorPlatform, _, key, err := a.platform()
 	if err != nil {
 		return manifest{}, err
 	}
-	if endpoint := a.endpoint(); endpoint != "" {
-		for _, file := range a.catalogFiles() {
-			for _, build := range cachedBuilds(file) {
-				if build.Name == v.String() && build.Type == "production" && (len(build.Components) > 0 || build.URLs[key].Checksum != "") {
-					return build, nil
-				}
-			}
-		}
-		data, err := a.metadata(endpoint+"/releases/"+v.String()+"?types=production", "Loading the SDK manifest")
-		if err != nil {
-			return manifest{}, err
-		}
-		var build manifest
-		if err := json.Unmarshal(data, &build); err != nil {
-			return build, err
-		}
-		if build.Name != v.String() || build.Type != "production" {
-			return build, fmt.Errorf("invalid manifest for AIR SDK %s", v)
-		}
-		return build, nil
-	}
-	data, err := a.metadata(a.mirrorURL, "Finding the "+mirrorPlatform+" SDK download")
+	data, err := a.metadata(a.mirrorURL, "Finding the "+mirrorPlatform+" SDK download", 15*time.Second)
 	if err != nil {
 		return manifest{}, err
 	}
@@ -278,57 +324,6 @@ func (a *app) sdkManifest(v sdkVersion) (manifest, error) {
 		}
 	}
 	return manifest{}, fmt.Errorf("no %s SDK download found for %s", mirrorPlatform, v)
-}
-
-func (a *app) download(info archiveInfo, method, name, destination string) (file string, err error) {
-	info.Checksum = strings.TrimSpace(info.Checksum)
-	checksum, err := hex.DecodeString(strings.TrimSpace(info.Checksum))
-	if err != nil || len(checksum) != sha256.Size {
-		return "", fmt.Errorf("invalid SHA-256 for %s", name)
-	}
-	ctx, cancel := context.WithTimeout(a.ctx, 600*time.Second)
-	defer cancel()
-	progress := &transfer{started: time.Now()}
-	progress.total.Store(info.Size)
-	if a.ui.interactive {
-		a.ui.notice("Downloading " + name)
-	}
-	stop := a.ui.activity("Downloading "+name, progress)
-	defer stop()
-	response, err := a.request(ctx, method, info.URL)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	if info.Size <= 0 {
-		progress.total.Store(response.ContentLength)
-	}
-	output, err := os.CreateTemp(destination, ".asm-download-*.zip")
-	if err != nil {
-		return "", err
-	}
-	file = output.Name()
-	defer func() {
-		output.Close()
-		if err != nil {
-			_ = os.Remove(file)
-		}
-	}()
-	hash := sha256.New()
-	count, err := io.Copy(io.MultiWriter(output, hash, progress), response.Body)
-	if err != nil {
-		return file, err
-	}
-	if err = output.Close(); err != nil {
-		return file, err
-	}
-	if info.Size > 0 && count != info.Size {
-		return file, fmt.Errorf("download size mismatch for %s", name)
-	}
-	if !strings.EqualFold(hex.EncodeToString(hash.Sum(nil)), info.Checksum) {
-		return file, fmt.Errorf("SHA-256 mismatch for %s", name)
-	}
-	return file, nil
 }
 
 func childPath(root, path string) (string, error) {
@@ -480,11 +475,55 @@ func (a *app) extract(file, destination string) error {
 	return nil
 }
 
+type sdkSource struct {
+	name string
+	load func(sdkVersion) (manifest, error)
+}
+
+// buildSDK assembles the SDK in destination. It uses the official API recipe
+// and falls back to the shockpkg mirror when that recipe fails at any point.
 func (a *app) buildSDK(v sdkVersion, destination string) error {
-	build, err := a.sdkManifest(v)
+	if _, _, _, err := a.platform(); err != nil {
+		return err
+	}
+	sources := []sdkSource{{"AIR SDK API", a.apiManifest}, {"shockpkg mirror", a.mirrorManifest}}
+	var failures []string
+	for i, source := range sources {
+		build, err := source.load(v)
+		if err == nil {
+			err = a.fetchSDK(v, build, destination)
+		}
+		if err == nil {
+			return a.finishSDK(v, destination)
+		}
+		if a.ctx.Err() != nil {
+			return a.ctx.Err()
+		}
+		failures = append(failures, fmt.Sprintf("%s: %v", source.name, err))
+		if i+1 < len(sources) {
+			a.ui.warning(fmt.Sprintf("%s failed: %v. Trying the %s.", source.name, err, sources[i+1].name))
+			if err := clearDirectory(destination); err != nil {
+				return err
+			}
+		}
+	}
+	return fmt.Errorf("cannot download AIR SDK %s: %s", v, strings.Join(failures, "; "))
+}
+
+func clearDirectory(directory string) error {
+	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return err
 	}
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(directory, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *app) fetchSDK(v sdkVersion, build manifest, destination string) error {
 	_, componentOS, key, err := a.platform()
 	if err != nil {
 		return err
@@ -501,9 +540,6 @@ func (a *app) buildSDK(v sdkVersion, destination string) error {
 		}
 		sort.Strings(names)
 		endpoint := a.endpoint()
-		if endpoint == "" {
-			endpoint = "https://api.airsdk.harman.com"
-		}
 		for _, name := range names {
 			info := build.Components[name]
 			if info.Version == "" {
@@ -554,8 +590,12 @@ func (a *app) buildSDK(v sdkVersion, destination string) error {
 			return fmt.Errorf("downloaded files do not contain a %s AIR SDK: %s", a.os, v)
 		}
 	}
+	return nil
+}
+
+func (a *app) finishSDK(v sdkVersion, destination string) error {
 	stop := a.ui.activity("Configuring the SDK", nil)
-	err = configureSDK(a.ctx, destination, a.arch)
+	err := configureSDK(a.ctx, destination, a.arch)
 	stop()
 	if err != nil {
 		return err

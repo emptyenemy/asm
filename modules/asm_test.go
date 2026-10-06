@@ -47,6 +47,10 @@ func testApp(t *testing.T) (*app, *bytes.Buffer, *bytes.Buffer) {
 	ui := &terminal{out: &out, err: &stderr, width: func() int { return 80 }}
 	a := newApp(context.Background(), ui, "1.0.0")
 	a.configFile = filepath.Join(t.TempDir(), ".airsdk", "airsdkmanager.cfg")
+	// Closed local port: a source nobody tests against fails fast instead of reaching the network.
+	closed := "http://127.0.0.1:1"
+	a.apiURL, a.newsURL, a.mirrorURL = closed, closed, closed
+	a.apiTimeout, a.retryDelay, a.stallTimeout = 2*time.Second, time.Millisecond, 2*time.Second
 	a.settings = map[string]string{"AIR_SDKS": filepath.Join(t.TempDir(), "SDKs [local] пробел"), "HAS_ACCEPTED_LICENSE": "true"}
 	if err := os.MkdirAll(a.settings["AIR_SDKS"], 0755); err != nil {
 		t.Fatal(err)
@@ -349,10 +353,12 @@ func TestCatalogFallbackAndNews(t *testing.T) {
 	}))
 	defer server.Close()
 	a.newsURL = server.URL + "/news"
-	if err := a.run([]string{"search", "51.4"}); err != nil || out.String() != "51.4.1.1\n" {
-		t.Fatalf("news: %v %s", err, out)
+	if err := a.run([]string{"search", "51.4"}); err != nil || out.String() != "51.4.1.1\n" || !strings.Contains(stderr.String(), "Using the announcement archive") {
+		t.Fatalf("news: %v %s %s", err, out, stderr)
 	}
+	stderr.Reset()
 	a.settings["API_ENDPOINT"] = server.URL
+	a.newsURL = "http://127.0.0.1:1"
 	if err := os.MkdirAll(filepath.Dir(a.configFile), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -405,11 +411,22 @@ func TestCancellationCleanup(t *testing.T) {
 	defer cancel()
 	a.ctx = ctx
 	root, _ := a.root()
-	_, err := a.download(archiveInfo{URL: server.URL, Checksum: strings.Repeat("0", 64), Size: 100000}, "GET", "fixture", root)
+	checksum := strings.Repeat("0", 64)
+	_, err := a.download(archiveInfo{URL: server.URL, Checksum: checksum, Size: 100000}, "GET", "fixture", root)
 	if err == nil {
 		t.Fatal("canceled download succeeded")
 	}
-	assertClean(t, a)
+	// Only the partial download stays, so that the next run can continue it.
+	entries, _ := os.ReadDir(root)
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".asm-") && entry.Name() != partialDirectory {
+			t.Errorf("temporary file remains: %s", entry.Name())
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(root, partialDirectory, checksum+".part"))
+	if err != nil || string(data) != "first" {
+		t.Fatalf("partial download: %q %v", data, err)
+	}
 }
 
 func TestZIPPathsAndUnixLinks(t *testing.T) {

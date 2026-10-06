@@ -126,6 +126,7 @@ func (t *terminal) rows(headers []string, rows [][]string) {
 
 type transfer struct {
 	received, total atomic.Int64
+	base            atomic.Int64 // bytes already on disk when the download began
 	started         time.Time
 }
 
@@ -171,7 +172,7 @@ func (t *terminal) activity(label string, progress *transfer) func() {
 				}
 				seconds := time.Since(progress.started).Seconds()
 				if seconds > 0 {
-					stats += "  " + formatBytes(float64(received)/seconds) + "/s"
+					stats += "  " + formatBytes(float64(max(0, received-progress.base.Load()))/seconds) + "/s"
 				}
 				percent := "  --"
 				if total > 0 {
@@ -256,8 +257,8 @@ func (t *terminal) help(topic string) {
 	lines := map[string][]string{
 		"uninstall": {"Alias: asm remove [VERSION]", "VERSION: an exact build or a prefix matching one installed SDK.", "Ambiguous versions are rejected; use a full version from asm list.", "Deletes that SDK directory from AIR_SDKS without keeping a backup.", "Does not change AIR SDK Manager settings or PATH."},
 		"list":      {"Alias: asm ls", "Reads AIR_SDKS from ~/.airsdk/airsdkmanager.cfg.", "Lists installed SDK versions and paths, newest first."},
-		"search":    {"VERSION is optional: a branch such as 51.4 or an exact build.", "Lists announced stable releases, newest first.", "Falls back to the manager catalog when the source is unavailable."},
-		"install":   {"VERSION: a branch such as 51.4, an exact build, or latest.", "Installs into AIR_SDKS; an installed build is kept.", "--accept-license  Accept the AIR SDK license for this operation."},
+		"search":    {"VERSION is optional: a branch such as 51.4 or an exact build.", "Lists announced stable releases, newest first.", "Falls back to the announcement archive and the manager catalog."},
+		"install":   {"VERSION: a branch such as 51.4, an exact build, or latest.", "Installs into AIR_SDKS; an installed build is kept.", "Falls back to the mirror if the official API fails.", "An interrupted download resumes on the next attempt.", "--accept-license  Accept the AIR SDK license for this operation."},
 		"update":    {"No arguments      Show installed updates and a newer SDK branch.", "VERSION           Update matching installed SDKs, such as 51.3.", "--all             Update all installed SDKs with a newer build.", "--check           Preview only, including with VERSION or --all.", "--accept-license  Accept the AIR SDK license for this operation.", "Updates preserve each SDK path and three-component version.", "Install new branches separately with asm install."},
 	}
 	for _, line := range lines[topic] {

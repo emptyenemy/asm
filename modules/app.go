@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type sdkVersion [4]int
@@ -91,14 +92,20 @@ type app struct {
 	configFile         string
 	settings           map[string]string
 	os, arch           string
+	apiURL             string
 	newsURL, mirrorURL string
+	apiTimeout         time.Duration
+	retryDelay         time.Duration
+	stallTimeout       time.Duration
 }
 
 func newApp(ctx context.Context, ui *terminal, version string) *app {
 	ui.version = version
 	home, _ := os.UserHomeDir()
 	return &app{version: version, ctx: ctx, ui: ui, configFile: filepath.Join(home, ".airsdk", "airsdkmanager.cfg"),
-		os: runtime.GOOS, arch: runtime.GOARCH, newsURL: "https://airsdk.dev/news/archive", mirrorURL: "https://shockpkg.github.io/packages/api/1/packages.json"}
+		os: runtime.GOOS, arch: runtime.GOARCH, apiURL: "https://api.airsdk.harman.com",
+		newsURL: "https://airsdk.dev/news/archive", mirrorURL: "https://shockpkg.github.io/packages/api/1/packages.json",
+		apiTimeout: 6 * time.Second, retryDelay: time.Second, stallTimeout: 30 * time.Second}
 }
 
 func (a *app) loadSettings() error {
