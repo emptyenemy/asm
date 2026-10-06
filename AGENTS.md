@@ -43,6 +43,10 @@ one `modules` package:
 
 No external dependencies or terminal UI library are required.
 
+The project page in `docs/` is plain HTML, CSS and JavaScript with no build
+step, served by GitHub Pages from the `/docs` folder of `main`. Keep it working
+without a network: no CDN, no web fonts, no analytics.
+
 ## Adding a command
 
 Five places, all of them:
