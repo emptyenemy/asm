@@ -82,7 +82,7 @@ called `asm`.
 
 | Windows, `install.ps1` | macOS and Linux, `install.sh` | Effect |
 | --- | --- | --- |
-| `-Version 1.0.0` | `ASM_VERSION=1.0.0` | Install that asm release instead of the latest. |
+| `-Version 1.0.1` | `ASM_VERSION=1.0.1` | Install that asm release instead of the latest. |
 | `-InstallDirectory C:\Tools\asm` | `ASM_INSTALL_DIR=/absolute/path` | Install somewhere else. |
 | `-NoPath` | `ASM_NO_PATH=1` | Leave `PATH` and shell profiles unchanged. |
 | `-ArchiveDirectory DIR` | `ASM_ARCHIVE_DIR=DIR` | Install from local release archives. Needs an explicit version and a directory with the matching archive and `SHA256SUMS`. |
@@ -90,7 +90,7 @@ called `asm`.
 PowerShell parameters need the script downloaded first:
 
 ```powershell
-./install.ps1 -Version 1.0.0 -InstallDirectory C:\Tools\asm
+./install.ps1 -Version 1.0.1 -InstallDirectory C:\Tools\asm
 ```
 
 Shell variables go in front of `sh`:
@@ -172,7 +172,7 @@ the file's line endings stay as the manager left them.
 | `asm clean` | Remove what an interrupted install or update left behind. |
 | `asm clean --check` | List what `clean` would change, without changing it. |
 | `asm help [COMMAND]` | Show help for asm or one command. |
-| `asm --version`, `asm -v` | Print the asm version, such as `1.0.0`. |
+| `asm --version`, `asm -v` | Print the asm version, such as `1.0.1`. |
 
 Square brackets mark a value you supply: type `51.4`, not `[51.4]`. `install`
 and `uninstall` need a version; `search`, `update` and `help` take one

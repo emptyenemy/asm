@@ -54,7 +54,7 @@ jobs:
           set -eu
           test "$(go env GOOS)" = "$TARGET_OS"
           test "$(go env GOARCH)" = "$TARGET_ARCH"
-          release_version="1.0.0"
+          release_version="1.0.1"
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             release_version="${GITHUB_REF_NAME#v}"
           fi

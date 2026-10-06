@@ -115,7 +115,7 @@ and debug information. The release workflow strips them, bakes the version in,
 and disables cgo; the same command locally is:
 
 ```sh
-CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=1.0.0" .
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=1.0.1" .
 ```
 
 On Windows, set `CGO_ENABLED=0` in the environment before running the command.
@@ -126,7 +126,7 @@ Panic messages still name functions and lines, because the runtime's own
 function table is not removed. `CGO_ENABLED=0` keeps the build pure Go, which
 on Linux produces a statically linked binary with no libc dependency, and it is
 what the release workflow uses. Use the version you are building in place of
-`1.0.0`; release archives take it from the tag.
+`1.0.1`; release archives take it from the tag.
 
 The same command with the same toolchain on the same commit produces a
 byte-identical binary, so a downloaded archive can be checked by rebuilding it.
@@ -348,13 +348,14 @@ written by `.github/scripts/archive_readme.py`, which points its images and
 links at the release commit on GitHub, since the files they name are not in
 the archive. Ordinary commits and pull
 requests produce workflow artifacts kept for seven days. Pushing a version
-tag such as `v1.0.0` publishes the five archives and `SHA256SUMS` to
+tag such as `v1.0.1` publishes the five archives and `SHA256SUMS` to
 [GitHub Releases](https://github.com/emptyenemy/asm/releases) after every build
 passes. The tag supplies the binary version, without the `v` prefix.
 Releases use the latest stable patch of Go 1.27; their OS minimums follow that
 toolchain. New dependencies should use their current stable versions.
 
-Version 1.0.0 is tagged `v1.0.0`; its archives come from the workflow above.
+Each release is a tag on `main`: `v1.0.0`, then `v1.0.1`. Its archives come from
+the workflow above, and nothing is uploaded by hand.
 
 ## Current development plan
 
@@ -372,10 +373,10 @@ AIR license. See also the
 [macOS](https://airsdk.dev/docs/basics/install/macos) and
 [Windows](https://airsdk.dev/docs/basics/install/windows) installation guides.
 
-Each feature is committed separately. Development continues on `1.0.0`;
-published releases and tags will be added only once that version is ready.
+Each feature is committed separately, and a release tags `main` once the
+build passes.
 
-### Planned for 1.0.0
+### Scope
 
 No command beyond the current set is planned; the remaining work is validation
 rather than new features.
