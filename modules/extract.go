@@ -11,6 +11,9 @@ import (
 	"strings"
 )
 
+// childPath resolves a path that is meant to live inside root and rejects
+// anything that escapes it, so an archive entry or a recorded SDK path cannot
+// reach the rest of the filesystem.
 func childPath(root, path string) (string, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -23,6 +26,8 @@ func childPath(root, path string) (string, error) {
 	return absolute, nil
 }
 
+// removeChild deletes a path, but only once childPath has confirmed that it
+// lies inside root.
 func removeChild(root, path string) error {
 	safe, err := childPath(root, path)
 	if err != nil {
@@ -31,6 +36,9 @@ func removeChild(root, path string) error {
 	return os.RemoveAll(safe)
 }
 
+// regularParents walks from target up to root and refuses to go on if any part
+// of the way already exists as a symbolic link, which is how a later entry
+// would otherwise be redirected outside the SDK directory.
 func regularParents(root, target string) error {
 	for path := target; path != root; path = filepath.Dir(path) {
 		info, err := os.Lstat(path)
@@ -52,6 +60,8 @@ type contextReader struct {
 	io.Reader
 }
 
+// Read reports the context error instead of touching the underlying reader
+// once the run has been interrupted.
 func (r contextReader) Read(data []byte) (int, error) {
 	if err := r.ctx.Err(); err != nil {
 		return 0, err
@@ -59,6 +69,11 @@ func (r contextReader) Read(data []byte) (int, error) {
 	return r.Reader.Read(data)
 }
 
+// extract unpacks the archive at file into destination and deletes the archive
+// afterwards. Every entry stays inside destination: names that are absolute or
+// carry a drive letter are rejected, an entry whose parent is a symbolic link
+// stops the whole run, and links are created last, once the directories they
+// point through are in place. Windows archives are expected to hold no links.
 func (a *app) extract(file, destination string) error {
 	defer os.Remove(file)
 	stop := a.ui.activity("Extracting the SDK", nil)

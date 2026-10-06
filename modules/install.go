@@ -45,6 +45,8 @@ func (a *app) buildSDK(v sdkVersion, destination string) error {
 	return fmt.Errorf("cannot download AIR SDK %s: %s", v, strings.Join(failures, "; "))
 }
 
+// clearDirectory empties a directory without removing it, so the staging
+// directory can be reused for the next source in the fallback chain.
 func clearDirectory(directory string) error {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
@@ -58,6 +60,10 @@ func clearDirectory(directory string) error {
 	return nil
 }
 
+// fetchSDK downloads the archives of one manifest and extracts them into
+// destination. A manifest that lists components is unpacked component by
+// component, one that carries a single archive is taken whole, and either way
+// the result must contain adt and adt.jar for this host to count as an SDK.
 func (a *app) fetchSDK(v sdkVersion, build manifest, destination string) error {
 	_, componentOS, key, err := a.platform()
 	if err != nil {
@@ -128,6 +134,8 @@ func (a *app) fetchSDK(v sdkVersion, build manifest, destination string) error {
 	return nil
 }
 
+// finishSDK applies the per-OS setup and writes air-sdk-description.xml, the
+// file installed SDK discovery reads to recognize the directory.
 func (a *app) finishSDK(v sdkVersion, destination string) error {
 	stop := a.ui.activity("Configuring the SDK", nil)
 	err := configureSDK(a.ctx, destination, a.arch)
@@ -140,6 +148,10 @@ func (a *app) finishSDK(v sdkVersion, destination string) error {
 	return os.WriteFile(filepath.Join(destination, "air-sdk-description.xml"), []byte(description), 0644)
 }
 
+// uninstall removes the one installed SDK the version argument selects. The
+// directory is re-read under the root lock and left alone if it changed since
+// the listing, and an argument that matches several SDKs is refused rather than
+// guessed at.
 func (a *app) uninstall(request string) error {
 	parts, err := versionParts(request)
 	if err != nil {
@@ -205,6 +217,10 @@ func (a *app) uninstall(request string) error {
 	return nil
 }
 
+// install resolves the requested version, assembles it in a staging directory
+// inside the SDK root, and moves it into place in one step, so an interrupted
+// run leaves a .asm-install- directory for clean to find rather than a partly
+// written version directory that looks installed.
 func (a *app) install(o options) error {
 	if o.filter == "" {
 		return errors.New("usage: asm install [VERSION] [--accept-license]; run asm help install")
@@ -311,6 +327,10 @@ func (a *app) install(o options) error {
 	return nil
 }
 
+// replaceSDK builds the new version beside the installed one and keeps the old
+// directory until the swap has succeeded, moving it back if the final step
+// fails. adt.cfg and adt.lic are carried over, since they hold the license and
+// the local configuration that no download can recreate.
 func (a *app) replaceSDK(sdk installedSDK, v sdkVersion) error {
 	root, err := a.root()
 	if err != nil {
@@ -389,6 +409,9 @@ func (a *app) replaceSDK(sdk installedSDK, v sdkVersion) error {
 	return nil
 }
 
+// update looks for a newer build in the same branch for each installed SDK and
+// reports what it found. A bare run and --check stop there; replacing the
+// installed SDKs needs a version argument or --all.
 func (a *app) update(o options) error {
 	var parts []int
 	if o.filter != "" {

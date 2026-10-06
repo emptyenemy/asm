@@ -45,8 +45,10 @@ type httpError struct {
 	status, address string
 }
 
+// Error reports the status line of the response that was rejected.
 func (e *httpError) Error() string { return fmt.Sprintf("HTTP %s from %s", e.status, e.address) }
 
+// request performs a metadata request, which never continues a partial body.
 func (a *app) request(ctx context.Context, method, address string) (*http.Response, error) {
 	return a.send(ctx, method, address, -1)
 }
@@ -83,6 +85,8 @@ func (a *app) send(ctx context.Context, method, address string, offset int64) (*
 	return response, nil
 }
 
+// metadata fetches a JSON document that is known to be small, under the given
+// timeout and activity label, and refuses a body larger than 16 MiB.
 func (a *app) metadata(address, label string, timeout time.Duration) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(a.ctx, timeout)
 	defer cancel()
@@ -100,6 +104,8 @@ func (a *app) metadata(address, label string, timeout time.Duration) ([]byte, er
 	return data, err
 }
 
+// catalogFiles lists the manager catalog and its backups, the newest backup
+// first, so a caller can fall through to an older copy when one is unreadable.
 func (a *app) catalogFiles() []string {
 	directory := filepath.Dir(a.configFile)
 	files := []string{filepath.Join(directory, "airsdkmanager.db")}
@@ -112,6 +118,8 @@ func (a *app) catalogFiles() []string {
 	return append(files, backups...)
 }
 
+// cachedBuilds collects the builds the AIR SDK Manager has recorded, skipping
+// entries that carry no usable build description.
 func cachedBuilds(path string) []manifest {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -150,6 +158,9 @@ func cachedBuilds(path string) []manifest {
 	return builds
 }
 
+// releaseNumbers collects the production builds into a sorted, de-duplicated
+// list. A build whose name is not a full version is reported, not skipped, so a
+// malformed catalog is visible instead of quietly short.
 func releaseNumbers(builds []manifest) ([]sdkVersion, error) {
 	var result []sdkVersion
 	seen := make(map[sdkVersion]bool)
@@ -170,6 +181,8 @@ func releaseNumbers(builds []manifest) ([]sdkVersion, error) {
 	return result, nil
 }
 
+// fetchAPIReleases reads the production release list from the HARMAN API. A
+// response without a releases array is an error rather than an empty catalog.
 func (a *app) fetchAPIReleases() ([]sdkVersion, error) {
 	data, err := a.metadata(a.endpoint()+"/releases?types=production", "Checking AIR SDK releases", a.apiTimeout)
 	if err != nil {
@@ -191,6 +204,9 @@ func (a *app) fetchAPIReleases() ([]sdkVersion, error) {
 	return releaseNumbers(response.Releases)
 }
 
+// fetchNewsReleases rebuilds the release list from the announcement archive for
+// the case where the API cannot be reached. It is a best-effort parse of the
+// page titles, so previews are skipped and no recognizable release is an error.
 func (a *app) fetchNewsReleases() ([]sdkVersion, error) {
 	data, err := a.metadata(a.newsURL, "Checking AIR SDK releases", 15*time.Second)
 	if err != nil {
