@@ -189,12 +189,20 @@ nav .out::after { content: " ↗"; color: var(--indigo); }
 /* a status line, the way a TUI ends */
 .status { margin-top: clamp(2rem, 5vw, 3rem); background: var(--deep); border-top: 1px solid var(--rule); font-size: 0.9em; }
 .status-inner { display: flex; flex-wrap: wrap; padding-top: 0; padding-bottom: 0; }
-.seg { padding: 0.55rem 1.5ch; color: var(--fog); border-right: 1px solid var(--rule); text-decoration: none; }
+.seg { padding: 0.55rem 1.5ch; color: var(--fog); border-right: 1px solid var(--rule); text-decoration: none; white-space: nowrap; }
 .seg:first-child { padding-left: 1ch; }
 .seg.on { background: var(--indigo); color: var(--night); font-weight: 700; border-right: 0; }
-.seg.grow { flex: 1; min-width: 20ch; }
+/* A status line stays one line: the note gives way first, cut short with an
+   ellipsis, and on a phone it moves to a row of its own under the segments. */
+.seg.grow { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 a.seg:hover { color: var(--paper); background: var(--night); }
 a.seg:last-child { border-right: 0; }
+@media (max-width: 52rem) {
+  .seg.grow { order: 1; flex-basis: 100%; white-space: normal; border-right: 0; border-top: 1px solid var(--rule); padding-left: 1ch; }
+}
+@media (max-width: 30rem) {
+  .seg { padding-left: 1ch; padding-right: 1ch; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
