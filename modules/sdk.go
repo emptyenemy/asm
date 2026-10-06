@@ -634,7 +634,7 @@ func (a *app) uninstall(request string) error {
 
 func (a *app) install(o options) error {
 	if o.filter == "" {
-		return errors.New("usage: asm install <VERSION> [--accept-license]; run asm help install")
+		return errors.New("usage: asm install [VERSION] [--accept-license]; run asm help install")
 	}
 	root, err := a.root()
 	if err != nil {

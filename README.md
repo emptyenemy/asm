@@ -145,21 +145,20 @@ version. No external dependencies or terminal UI library are required.
 | `asm --version`, `asm -v` | Print only the manager version: `1.0.0`. |
 | `asm list`, `asm ls` | List installed SDK versions and absolute paths. |
 | `asm search [VERSION]` | List announced stable releases, newest first. |
-| `asm install <VERSION>` | Install a branch, an exact build, or `latest`. |
-| `asm uninstall <VERSION>`, `asm remove <VERSION>` | Delete one installed SDK selected by exact version or an unambiguous prefix. |
+| `asm install [VERSION]` | Install a branch, an exact build, or `latest`. |
+| `asm uninstall [VERSION]`, `asm remove [VERSION]` | Delete one installed SDK selected by exact version or an unambiguous prefix. |
 | `asm update` | Show updates for installed SDKs and announce a newer uninstalled branch. |
-| `asm update <VERSION>` | Update matching installed SDKs. |
+| `asm update [VERSION]` | Update matching installed SDKs. |
 | `asm update --all` | Update every installed SDK that has a newer build. |
-| `asm update <VERSION> --check` | Preview updates for selected SDKs. |
+| `asm update [VERSION] --check` | Preview updates for selected SDKs. |
 | `asm update --all --check` | Preview all installed updates and the new-branch notice. |
 
-Angle brackets mark required arguments; square brackets mark optional ones.
-Replace `VERSION` with the appropriate value; do not type the brackets.
+Square brackets mark a placeholder: replace `[VERSION]` with the appropriate
+value and do not type the brackets. `install` and `uninstall` require a
+version; `search`, `update`, and `help` accept one optionally.
 
 Help is also available through `asm --help`, `asm -h`, and commands such as
-`asm install --help` or `asm update -h`. `install` currently requires a version.
-`install --version VERSION`, `--json`, and other undocumented options are not
-implemented yet.
+`asm install --help` or `asm update -h`. `install` requires a version.
 
 Errors and warnings go to stderr. Successful commands return `0`; errors return
 `1`. Unknown commands and unexpected arguments are rejected.

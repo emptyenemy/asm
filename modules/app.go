@@ -285,7 +285,7 @@ func (a *app) run(args []string) error {
 	switch command {
 	case "uninstall":
 		if len(rest) != 1 {
-			return errors.New("usage: asm uninstall <VERSION>; run asm help uninstall")
+			return errors.New("usage: asm uninstall [VERSION]; run asm help uninstall")
 		}
 		return a.uninstall(rest[0])
 	case "list":
