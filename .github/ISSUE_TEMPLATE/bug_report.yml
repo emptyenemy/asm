@@ -1,0 +1,35 @@
+name: Bug report
+description: Something asm did wrong, or could not do.
+body:
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The command you ran and everything it printed. Add `2>&1 | more` or redirect it to a file if colors get in the way.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: version
+    attributes:
+      label: asm version
+      description: What `asm --version` prints.
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows x64
+        - macOS, Apple Silicon
+        - macOS, Intel
+        - Linux x64
+        - Linux ARM64
+    validations:
+      required: true

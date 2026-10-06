@@ -404,9 +404,10 @@ rules.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. [AGENTS.md](AGENTS.md) covers the
-code layout, building and testing, the commit conventions, and the notes on
-the AIR SDK sources asm talks to.
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
+gets you from clone to passing tests in a minute and shows where things live;
+[AGENTS.md](AGENTS.md) holds the file-by-file map, the release build, and the
+notes on the AIR SDK services asm talks to.
 
 ## License
 
