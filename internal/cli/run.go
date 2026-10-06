@@ -8,14 +8,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 )
-
-type options struct {
-	filter              string
-	all, check, license bool
-}
 
 type app struct {
 	version            string
@@ -40,48 +34,16 @@ func newApp(ctx context.Context, ui *terminal, version string) *app {
 		apiTimeout: 6 * time.Second, retryDelay: time.Second, stallTimeout: 30 * time.Second}
 }
 
-func parseOptions(command string, args []string) (options, error) {
-	var o options
-	for _, arg := range args {
-		switch arg {
-		case "--accept-license":
-			if command != "install" && command != "update" {
-				return o, fmt.Errorf("unknown option %s", arg)
-			}
-			o.license = true
-		case "--all":
-			if command != "update" {
-				return o, fmt.Errorf("unknown option %s", arg)
-			}
-			o.all = true
-		case "--check":
-			if command != "update" && command != "clean" {
-				return o, fmt.Errorf("unknown option %s", arg)
-			}
-			o.check = true
-		default:
-			if strings.HasPrefix(arg, "-") {
-				return o, fmt.Errorf("unknown option %s", arg)
-			}
-			if o.filter != "" {
-				return o, errors.New("unexpected arguments; run asm help")
-			}
-			o.filter = arg
-		}
-	}
-	if o.all && o.filter != "" {
-		return o, errors.New("a version and --all cannot be combined")
-	}
-	return o, nil
-}
-
+// run dispatches one command line: the general help, --version, a command's
+// help, or the command itself with its arguments checked against the table.
 func (a *app) run(args []string) error {
 	if len(args) == 0 {
 		a.ui.help("")
 		return nil
 	}
-	command, rest := args[0], args[1:]
-	if command == "help" {
+	name, rest := args[0], args[1:]
+	switch {
+	case name == "help":
 		if len(rest) > 1 {
 			return errors.New("unexpected arguments; run asm help")
 		}
@@ -89,125 +51,32 @@ func (a *app) run(args []string) error {
 			a.ui.help("")
 			return nil
 		}
-		if rest[0] == "ls" {
-			rest[0] = "list"
-		}
-		if rest[0] == "remove" {
-			rest[0] = "uninstall"
-		}
-		if !validCommand(rest[0]) {
+		c, ok := findCommand(rest[0])
+		if !ok {
 			return fmt.Errorf("unknown help topic %q", rest[0])
 		}
-		a.ui.help(rest[0])
+		a.ui.help(c.name)
 		return nil
-	}
-	if len(rest) == 0 && (command == "--version" || command == "-v") {
+	case len(rest) == 0 && (name == "--version" || name == "-v"):
 		a.ui.line(a.version, "accent")
 		return nil
-	}
-	if len(rest) == 0 && (command == "--help" || command == "-h") {
+	case len(rest) == 0 && (name == "--help" || name == "-h"):
 		a.ui.help("")
 		return nil
 	}
-	if command == "ls" {
-		command = "list"
-	}
-	if command == "remove" {
-		command = "uninstall"
-	}
-	if !validCommand(command) {
-		return fmt.Errorf("unknown command %q; run asm help", command)
+	c, ok := findCommand(name)
+	if !ok {
+		return fmt.Errorf("unknown command %q; run asm help", name)
 	}
 	if len(rest) == 1 && (rest[0] == "--help" || rest[0] == "-h") {
-		a.ui.help(command)
+		a.ui.help(c.name)
 		return nil
 	}
-	switch command {
-	case "uninstall":
-		if len(rest) != 1 {
-			return errors.New("usage: asm uninstall [VERSION]; run asm help uninstall")
-		}
-		return a.uninstall(rest[0])
-	case "list":
-		if len(rest) != 0 {
-			return errors.New("unexpected arguments; run asm help list")
-		}
-		sdks, err := a.installed()
-		if err != nil {
-			return err
-		}
-		a.ui.heading("Installed AIR SDKs")
-		if len(sdks) == 0 {
-			a.ui.say("No local AIR SDK versions found.", "")
-			if a.ui.interactive {
-				a.ui.gap()
-				a.ui.hint("Install:", "asm install latest")
-			}
-			return nil
-		}
-		var rows [][]string
-		for _, sdk := range sdks {
-			rows = append(rows, []string{sdk.Version.String(), sdk.Path})
-		}
-		a.ui.rows([]string{"Version", "Path"}, rows)
-	case "search":
-		if len(rest) > 1 {
-			return errors.New("unexpected arguments; run asm help search")
-		}
-		var parts []int
-		if len(rest) == 1 {
-			var err error
-			parts, err = versionParts(rest[0])
-			if err != nil {
-				return err
-			}
-		}
-		versions, err := a.releases()
-		if err != nil {
-			return err
-		}
-		a.ui.heading("Available AIR SDKs")
-		var matches []sdkVersion
-		for _, v := range versions {
-			if v.matches(parts) {
-				matches = append(matches, v)
-			}
-		}
-		if len(matches) == 0 {
-			a.ui.say("No matching AIR SDK versions found.", "")
-			return nil
-		}
-		for _, v := range matches {
-			a.ui.say(v.String(), "accent")
-		}
-		if a.ui.interactive {
-			a.ui.gap()
-			a.ui.hint("Install:", "asm install "+matches[0].String())
-		}
-	case "clean":
-		o, err := parseOptions(command, rest)
-		if err != nil {
-			return err
-		}
-		if o.filter != "" {
-			return errors.New("unexpected arguments; run asm help clean")
-		}
-		return a.clean(o.check)
-	case "install", "update":
-		o, err := parseOptions(command, rest)
-		if err != nil {
-			return err
-		}
-		if command == "install" {
-			return a.install(o)
-		}
-		return a.update(o)
+	o, err := c.parse(rest)
+	if err != nil {
+		return err
 	}
-	return nil
-}
-
-func validCommand(command string) bool {
-	return command == "list" || command == "search" || command == "install" || command == "update" || command == "uninstall" || command == "clean"
+	return c.run(a, o)
 }
 
 // finish reports how a run ended: the error that stopped it, or the blank

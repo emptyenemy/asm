@@ -33,8 +33,9 @@ one package, `internal/cli`, one concern per file:
 
 | File | Responsibility |
 | --- | --- |
-| `run.go` | `Run`, the app, option parsing and command dispatch. |
-| `install.go`, `update.go`, `uninstall.go`, `clean.go` | One command each. |
+| `commands.go` | Every command in one table: name, alias, help texts, arguments, and the method that runs it. |
+| `run.go` | `Run`, the app, and dispatch from that table. |
+| `list.go`, `search.go`, `install.go`, `update.go`, `uninstall.go`, `clean.go` | One command each. |
 | `config.go` | The AIR SDK Manager settings file and the API endpoint it may override. |
 | `version.go` | The SDK version type: parsing, ordering, prefix matching. |
 | `installed.go` | Finding installed SDKs through their `air-sdk-description.xml`. |
@@ -60,23 +61,19 @@ without a network: no CDN, no web fonts, no analytics.
 
 ## Adding a command
 
-Five places, all of them:
-
-1. `internal/cli/run.go` — add the name to `validCommand`.
-2. `internal/cli/run.go` — add a `case` to the switch in `run`, and reject unwanted
-   arguments the way the neighbouring cases do.
-3. `internal/cli/run.go` — if the command takes options, handle them in
-   `parseOptions` and reject the flags it does not accept.
-4. `internal/cli/help.go` — add a `helpTopics` entry and a line to the general
-   help.
-5. `README.md` — add a row to the command table.
+1. `internal/cli/commands.go` — add an entry to `commands`: the name and an
+   optional alias, the line for the general help, the usage and help lines,
+   whether it takes a version, the options it accepts, and the method that
+   runs it. Dispatch, argument checks, `--help` and both kinds of help are
+   built from that entry; a new option also needs a field in `options` and a
+   case in `parse`.
+2. A file named after the command with that method,
+   `func (a *app) name(o options) error`.
+3. `README.md` — a row in the command table and a section under "How each
+   command behaves".
 
 Then cover it with tests, and add the command to the invalid-argument and help
 cases in `TestCommandsAndVersionOutput`.
-
-Those first four are separate lists, which is the honest weak spot of this
-layout: a new command has to be added to each. Collapsing them into one table
-per command is the obvious next improvement and has not been done yet.
 
 ## Commits
 

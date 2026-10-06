@@ -1,9 +1,9 @@
 // Package cli is everything behind asm's main: the commands, the AIR SDK
 // catalogs and downloads, SDK assembly, and what is printed on the way.
 //
-// Commands: run.go parses the arguments and dispatches; install.go,
-// update.go, uninstall.go and clean.go implement the commands that change
-// SDKs.
+// Commands: commands.go describes every command in one table, run.go
+// dispatches from it, and list.go, search.go, install.go, update.go,
+// uninstall.go and clean.go each implement one.
 //
 // SDKs: version.go parses and compares version numbers, config.go reads the
 // AIR SDK Manager settings, installed.go finds installed SDKs, catalog.go

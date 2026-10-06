@@ -71,7 +71,8 @@ func isEmptyDirectory(path string) bool {
 // SDK root. Incomplete downloads and staging directories are junk by
 // definition; an SDK saved for rollback is moved back into place when its
 // build is no longer installed and removed when it is.
-func (a *app) clean(check bool) error {
+func (a *app) clean(o options) error {
+	check := o.check
 	root, err := a.root()
 	if err != nil {
 		return err

@@ -10,7 +10,8 @@ import (
 // directory is re-read under the root lock and left alone if it changed since
 // the listing, and an argument that matches several SDKs is refused rather than
 // guessed at.
-func (a *app) uninstall(request string) error {
+func (a *app) uninstall(o options) error {
+	request := o.filter
 	parts, err := versionParts(request)
 	if err != nil {
 		return err
