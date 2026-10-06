@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 568 218" width="568" height="218" role="img" aria-label="asm">
+<defs>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="20" y1="0" x2="548" y2="218"><stop offset="0.15" stop-color="#4f46e5"/><stop offset="0.9" stop-color="#7c3aed"/></linearGradient>
+<filter id="b" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<g font-family="'Cascadia Mono','SF Mono',Menlo,Consolas,'DejaVu Sans Mono','Liberation Mono',monospace" font-size="40" font-weight="700" fill="url(#g)">
+<text x="68" y="56" textLength="456" lengthAdjust="spacingAndGlyphs" xml:space="preserve">____ __________ ___</text>
+<text x="44" y="102" textLength="504" lengthAdjust="spacingAndGlyphs" xml:space="preserve">/ __ `/ ___/ __ `__ \</text>
+<text x="20" y="148" textLength="528" lengthAdjust="spacingAndGlyphs" xml:space="preserve">/ /_/ (__  ) / / / / /</text>
+<text x="20" y="194" textLength="504" lengthAdjust="spacingAndGlyphs" xml:space="preserve">\__,_/____/_/ /_/ /_/</text>
+</g>
+</svg>
