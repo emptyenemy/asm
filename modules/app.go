@@ -215,6 +215,9 @@ func parseOptions(command string, args []string) (options, error) {
 	for _, arg := range args {
 		switch arg {
 		case "--accept-license":
+			if command != "install" && command != "update" {
+				return o, fmt.Errorf("unknown option %s", arg)
+			}
 			o.license = true
 		case "--all":
 			if command != "update" {
@@ -222,7 +225,7 @@ func parseOptions(command string, args []string) (options, error) {
 			}
 			o.all = true
 		case "--check":
-			if command != "update" {
+			if command != "update" && command != "clean" {
 				return o, fmt.Errorf("unknown option %s", arg)
 			}
 			o.check = true
@@ -351,6 +354,15 @@ func (a *app) run(args []string) error {
 			a.ui.line("", "")
 			a.ui.wrap("Install: asm install "+matches[0].String(), 2, "muted")
 		}
+	case "clean":
+		o, err := parseOptions(command, rest)
+		if err != nil {
+			return err
+		}
+		if o.filter != "" {
+			return errors.New("unexpected arguments; run asm help clean")
+		}
+		return a.clean(o.check)
 	case "install", "update":
 		o, err := parseOptions(command, rest)
 		if err != nil {
@@ -365,7 +377,7 @@ func (a *app) run(args []string) error {
 }
 
 func validCommand(command string) bool {
-	return command == "list" || command == "search" || command == "install" || command == "update" || command == "uninstall"
+	return command == "list" || command == "search" || command == "install" || command == "update" || command == "uninstall" || command == "clean"
 }
 
 var newsLinks = regexp.MustCompile(`(?is)<a\b[^>]*\bhref="/news/\d{4}/\d{2}/\d{2}/[^"\s]+"[^>]*>(.*?)</a>`)

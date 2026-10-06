@@ -236,7 +236,7 @@ func (t *terminal) help(topic string) {
 		t.line("", "")
 		t.wrap("Usage: asm <command> [options]", 2, "")
 		t.line("", "")
-		entries := [][]string{{"list, ls", "List installed SDKs and their paths."}, {"search [VERSION]", "Find available stable releases."}, {"install [VERSION]", "Install a branch, exact build, or latest."}, {"update [VERSION]", "Check updates; a version applies them."}, {"uninstall [VERSION]", "Remove one installed SDK. Alias: remove."}, {"help [COMMAND]", "Show general or command help."}, {"--version, -v", "Print the asm version."}}
+		entries := [][]string{{"list, ls", "List installed SDKs and their paths."}, {"search [VERSION]", "Find available stable releases."}, {"install [VERSION]", "Install a branch, exact build, or latest."}, {"update [VERSION]", "Check updates; a version applies them."}, {"uninstall [VERSION]", "Remove one installed SDK. Alias: remove."}, {"clean", "Remove what an interrupted operation left behind."}, {"help [COMMAND]", "Show general or command help."}, {"--version, -v", "Print the asm version."}}
 		for _, entry := range entries {
 			if t.width() >= 70 {
 				t.line("  "+t.style(fmt.Sprintf("%-20s", entry[0]), "accent")+entry[1], "")
@@ -251,7 +251,7 @@ func (t *terminal) help(topic string) {
 		t.line("", "")
 		return
 	}
-	usage := map[string]string{"list": "asm list", "search": "asm search [VERSION]", "install": "asm install [VERSION] [--accept-license]", "update": "asm update [VERSION] [--all] [--check] [--accept-license]", "uninstall": "asm uninstall [VERSION]"}
+	usage := map[string]string{"list": "asm list", "search": "asm search [VERSION]", "install": "asm install [VERSION] [--accept-license]", "update": "asm update [VERSION] [--all] [--check] [--accept-license]", "uninstall": "asm uninstall [VERSION]", "clean": "asm clean [--check]"}
 	t.wrap("Usage: "+usage[topic], 2, "accent")
 	t.line("", "")
 	lines := map[string][]string{
@@ -260,6 +260,7 @@ func (t *terminal) help(topic string) {
 		"search":    {"VERSION is optional: a branch such as 51.4 or an exact build.", "Lists announced stable releases, newest first.", "Falls back to the announcement archive and the manager catalog."},
 		"install":   {"VERSION: a branch such as 51.4, an exact build, or latest.", "Installs into AIR_SDKS; an installed build is kept.", "Falls back to the mirror if the official API fails.", "An interrupted download resumes on the next attempt.", "--accept-license  Accept the AIR SDK license for this operation."},
 		"update":    {"No arguments      Show installed updates and a newer SDK branch.", "VERSION           Update matching installed SDKs, such as 51.3.", "--all             Update all installed SDKs with a newer build.", "--check           Preview only, including with VERSION or --all.", "--accept-license  Accept the AIR SDK license for this operation.", "Updates preserve each SDK path and three-component version.", "Install new branches separately with asm install."},
+		"clean":     {"Removes incomplete downloads and temporary directories left by an interrupted install or update.", "Restores an SDK that an interrupted update saved for rollback and left out of place.", "Removes empty version directories that would block installing that version again.", "Does not touch installed SDKs, settings, or unrelated files.", "--check  List what would be removed without changing anything."},
 	}
 	for _, line := range lines[topic] {
 		t.wrap(line, 2, "")

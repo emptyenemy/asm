@@ -60,11 +60,16 @@ func testApp(t *testing.T) (*app, *bytes.Buffer, *bytes.Buffer) {
 
 func fixtureInstalled(t *testing.T, a *app, number string) string {
 	t.Helper()
+	return fixtureSDKAt(t, a, "arbitrary_"+number, number)
+}
+
+func fixtureSDKAt(t *testing.T, a *app, name, number string) string {
+	t.Helper()
 	root, err := a.root()
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(root, "arbitrary_"+number)
+	path := filepath.Join(root, name)
 	if err := os.MkdirAll(filepath.Join(path, "lib"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -138,12 +143,12 @@ func TestCommandsAndVersionOutput(t *testing.T) {
 			t.Fatalf("version output: %q %q", out, stderr)
 		}
 	}
-	for _, args := range [][]string{{"install"}, {"update", "51", "--all"}, {"list", "extra"}, {"search", "bad"}, {"install", "51", "--json"}, {"help", "no"}, {"unknown"}} {
+	for _, args := range [][]string{{"install"}, {"update", "51", "--all"}, {"list", "extra"}, {"search", "bad"}, {"install", "51", "--json"}, {"help", "no"}, {"clean", "51"}, {"unknown"}} {
 		if err := a.run(args); err == nil {
 			t.Errorf("accepted invalid arguments: %v", args)
 		}
 	}
-	for _, args := range [][]string{nil, {"help"}, {"help", "update"}, {"search", "-h"}, {"install", "--help"}} {
+	for _, args := range [][]string{nil, {"help"}, {"help", "update"}, {"help", "clean"}, {"search", "-h"}, {"install", "--help"}, {"clean", "-h"}} {
 		if err := a.run(args); err != nil {
 			t.Fatal(err)
 		}

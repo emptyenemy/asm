@@ -152,6 +152,8 @@ version. No external dependencies or terminal UI library are required.
 | `asm update --all` | Update every installed SDK that has a newer build. |
 | `asm update [VERSION] --check` | Preview updates for selected SDKs. |
 | `asm update --all --check` | Preview all installed updates and the new-branch notice. |
+| `asm clean` | Remove incomplete downloads and temporary directories left by an interrupted operation. |
+| `asm clean --check` | List what `clean` would change without changing anything. |
 
 Square brackets mark a placeholder: replace `[VERSION]` with the appropriate
 value and do not type the brackets. `install` and `uninstall` require a
@@ -321,6 +323,25 @@ bytes are kept for a later run. `asm list` and `uninstall` ignore that
 directory. A verified download replaces the partial file; data that fails
 verification, and leftovers older than seven days, are deleted.
 
+### Leftovers and `asm clean`
+
+Cancelling with `Ctrl+C` stops the operation and cleans up what it staged.
+Closing the terminal window, pressing `Ctrl+C` twice, killing the process, or
+losing power skips that cleanup, and `asm clean` is the way back:
+
+| Leftover | What `clean` does |
+| --- | --- |
+| `.asm-partial` | Removes incomplete downloads. The next install starts over instead of resuming. |
+| `.asm-install-*`, `.asm-update-*` | Removes staging directories from an interrupted install or update. |
+| `.asm-old-*` | An SDK renamed away for an update rollback: moved back when that build is no longer installed, removed when it is. |
+| An empty version directory | Removed. A directory created just before its contents were moved in would otherwise block installing that version again. |
+
+`clean` takes the same SDK root lock as `install` and `update`, so it refuses
+to run beside them and releases the lock file on exit. Installed SDKs,
+settings, and unrelated files are never touched. A saved SDK whose description
+cannot be read is reported and left in place. `clean --check` prints the same
+report without changing anything.
+
 ## Sources and fallback options
 
 The network findings below were recorded on **October 5, 2026**. Availability
@@ -483,7 +504,7 @@ rather than new features. A version tag is deliberately withheld until that
 validation passes.
 
 The command set is deliberately small: `list`, `search`, `install`, `update`,
-`uninstall`. SDK selection, running tools, and other extras are
+`uninstall`, and `clean`. SDK selection, running tools, and other extras are
 out of scope. License acceptance remains explicit.
 
 Go is the implementation language. Use its standard HTTP/ZIP support and keep
@@ -499,9 +520,10 @@ is a starting point.
 Run `go test ./...` and `go vet ./...`. Tests create small SDK/ZIP fixtures in
 temporary directories and use local HTTP servers. They exercise numeric
 versions, idempotent installation, spaces/Unicode, licenses, source failures,
-cleanup, configuration/license preservation, new-branch notifications, and
 hashes, sizes, retries, stalled transfers, resumption across runs, source
 fallback, ZIP traversal, SDK structure, locking, occupied destinations,
+cleanup, leftover sweeping and its `--check` mode, configuration/license
+preservation, new-branch notifications, and
 uninstall ambiguity. Linux checks also cover architecture setup and legacy
 path corrections; Unix checks cover symbolic links. Test directories are
 removed automatically. Full SDK downloads and tools still need separate
