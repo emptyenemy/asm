@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -48,6 +50,40 @@ type httpError struct {
 // Error reports the status line of the response that was rejected.
 func (e *httpError) Error() string { return fmt.Sprintf("HTTP %s from %s", e.status, e.address) }
 
+// requestError keeps a failed request's cause for errors.Is and errors.As
+// but reads like a sentence. Go's *url.Error repeats the method and the
+// whole address, and a refused connection carries the operating system's
+// own paragraph; the host and what went wrong is what a person can act on.
+type requestError struct {
+	text string
+	err  error
+}
+
+func (e *requestError) Error() string { return e.text }
+func (e *requestError) Unwrap() error { return e.err }
+
+func shortRequestError(err error) error {
+	var failed *url.Error
+	if !errors.As(err, &failed) || errors.Is(err, context.Canceled) {
+		return err
+	}
+	host := failed.URL
+	if parsed, parseErr := url.Parse(failed.URL); parseErr == nil && parsed.Host != "" {
+		host = parsed.Host
+	}
+	var dns *net.DNSError
+	var dial *net.OpError
+	switch {
+	case failed.Timeout():
+		return &requestError{"no answer from " + host, err}
+	case errors.As(err, &dns):
+		return &requestError{"cannot resolve " + host, err}
+	case errors.As(err, &dial) && dial.Op == "dial":
+		return &requestError{"cannot connect to " + host, err}
+	}
+	return &requestError{fmt.Sprintf("request to %s failed: %v", host, failed.Err), err}
+}
+
 // request performs a metadata request, which never continues a partial body.
 func (a *app) request(ctx context.Context, method, address string) (*http.Response, error) {
 	return a.send(ctx, method, address, -1)
@@ -76,7 +112,7 @@ func (a *app) send(ctx context.Context, method, address string, offset int64) (*
 	}
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, shortRequestError(err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		response.Body.Close()
