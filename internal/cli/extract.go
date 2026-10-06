@@ -11,31 +11,6 @@ import (
 	"strings"
 )
 
-// childPath resolves a path that is meant to live inside root and rejects
-// anything that escapes it, so an archive entry or a recorded SDK path cannot
-// reach the rest of the filesystem.
-func childPath(root, path string) (string, error) {
-	absolute, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	relative, err := filepath.Rel(root, absolute)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return "", fmt.Errorf("path is outside the SDK directory: %s", path)
-	}
-	return absolute, nil
-}
-
-// removeChild deletes a path, but only once childPath has confirmed that it
-// lies inside root.
-func removeChild(root, path string) error {
-	safe, err := childPath(root, path)
-	if err != nil {
-		return err
-	}
-	return os.RemoveAll(safe)
-}
-
 // regularParents walks from target up to root and refuses to go on if any part
 // of the way already exists as a symbolic link, which is how a later entry
 // would otherwise be redirected outside the SDK directory.

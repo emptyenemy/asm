@@ -27,19 +27,28 @@ it.
 
 The root `main.go` starts the CLI and supplies its build version, and `go.mod`
 declares the import path and the minimum Go version. Everything else lives in
-one package, `internal/cli`:
+one package, `internal/cli`, one concern per file:
 
 | File | Responsibility |
 | --- | --- |
-| `internal/cli/app.go` | Command dispatch, options, the settings file, installed SDK discovery, the SDK version type and its parsing. |
-| `internal/cli/terminal.go` | Output rendering and the command help. |
-| `internal/cli/sdk.go` | Platform selection and the small helpers shared across files. |
-| `internal/cli/catalog.go` | Release lists and build manifests from the official API, the announcement archive and the manager catalog. |
-| `internal/cli/download.go` | Archive downloads: retries, resuming, verification, leftover partial files. |
-| `internal/cli/extract.go` | ZIP extraction and the path checks that keep it inside the SDK directory. |
-| `internal/cli/install.go` | `install`, `update`, `uninstall` and SDK assembly. |
-| `internal/cli/clean.go` | Removing what an interrupted operation left behind. |
-| `internal/cli/platform_unix.go`, `internal/cli/platform_windows.go` | The per-OS pieces: locking, directory moves, SDK configuration. |
+| `run.go` | `Run`, the app, option parsing and command dispatch. |
+| `install.go`, `update.go`, `uninstall.go`, `clean.go` | One command each. |
+| `config.go` | The AIR SDK Manager settings file and the API endpoint it may override. |
+| `version.go` | The SDK version type: parsing, ordering, prefix matching. |
+| `installed.go` | Finding installed SDKs through their `air-sdk-description.xml`. |
+| `catalog.go` | Release lists and build manifests from the official API, the announcement archive and the manager catalog. |
+| `http.go` | Requests, HTTP status errors, and network errors shortened to the host and the cause. |
+| `download.go` | Archive downloads: retries, resuming, verification, leftover partial files. |
+| `extract.go` | ZIP extraction. |
+| `assemble.go` | Turning a build manifest into an SDK, with the shockpkg mirror as the fallback recipe. |
+| `paths.go` | The path checks that keep every write inside the SDK directory. |
+| `platform.go`, `platform_unix.go`, `platform_windows.go` | The host's SDK build, and the per-OS pieces: locking, directory moves, SDK configuration, the console. |
+| `terminal.go` | Output: framing, indentation, color, columns. |
+| `progress.go` | Spinners and the download bar. |
+| `help.go` | General and per-command help. |
+
+`doc.go` gives the same map in the package documentation, so `go doc` and an
+editor show it too.
 
 No external dependencies or terminal UI library are required.
 
@@ -51,13 +60,13 @@ without a network: no CDN, no web fonts, no analytics.
 
 Five places, all of them:
 
-1. `internal/cli/app.go` — add the name to `validCommand`.
-2. `internal/cli/app.go` — add a `case` to the switch in `run`, and reject unwanted
+1. `internal/cli/run.go` — add the name to `validCommand`.
+2. `internal/cli/run.go` — add a `case` to the switch in `run`, and reject unwanted
    arguments the way the neighbouring cases do.
-3. `internal/cli/app.go` — if the command takes options, handle them in
+3. `internal/cli/run.go` — if the command takes options, handle them in
    `parseOptions` and reject the flags it does not accept.
-4. `internal/cli/terminal.go` — add the name to `help`: the `usage` map, the `lines`
-   map, and the `entries` list in the general help.
+4. `internal/cli/help.go` — add a `helpTopics` entry and a line to the general
+   help.
 5. `README.md` — add a row to the command table.
 
 Then cover it with tests, and add the command to the invalid-argument and help

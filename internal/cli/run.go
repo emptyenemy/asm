@@ -2,89 +2,21 @@ package cli
 
 import (
 	"context"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
 
-type sdkVersion [4]int
-
-func versionParts(text string) ([]int, error) {
-	parts := strings.Split(text, ".")
-	if len(parts) < 1 || len(parts) > 4 {
-		return nil, errors.New("expected a version such as 51.4 or 51.4.1.1")
-	}
-	result := make([]int, len(parts))
-	for i, part := range parts {
-		if part == "" || strings.Trim(part, "0123456789") != "" {
-			return nil, errors.New("expected a version such as 51.4 or 51.4.1.1")
-		}
-		n, err := strconv.ParseUint(part, 10, 31)
-		if err != nil {
-			return nil, errors.New("version component is too large")
-		}
-		result[i] = int(n)
-	}
-	return result, nil
-}
-
-func parseVersion(text string) (sdkVersion, error) {
-	parts, err := versionParts(text)
-	if err != nil {
-		return sdkVersion{}, err
-	}
-	if len(parts) != 4 {
-		return sdkVersion{}, errors.New("expected a full four-component SDK version")
-	}
-	return sdkVersion{parts[0], parts[1], parts[2], parts[3]}, nil
-}
-
-func (v sdkVersion) String() string {
-	if v[3] < 0 {
-		return fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2])
-	}
-	return fmt.Sprintf("%d.%d.%d.%d", v[0], v[1], v[2], v[3])
-}
-
-func (v sdkVersion) newer(other sdkVersion) bool {
-	for i := range v {
-		if v[i] != other[i] {
-			return v[i] > other[i]
-		}
-	}
-	return false
-}
-
-func (v sdkVersion) matches(parts []int) bool {
-	for i, part := range parts {
-		if v[i] != part {
-			return false
-		}
-	}
-	return true
-}
-
-func (v sdkVersion) branch(other sdkVersion) bool {
-	return v[0] == other[0] && v[1] == other[1] && v[2] == other[2]
-}
-
-type installedSDK struct {
-	Version sdkVersion
-	Path    string
-}
 type options struct {
 	filter              string
 	all, check, license bool
 }
+
 type app struct {
 	version            string
 	ctx                context.Context
@@ -106,108 +38,6 @@ func newApp(ctx context.Context, ui *terminal, version string) *app {
 		os: runtime.GOOS, arch: runtime.GOARCH, apiURL: "https://api.airsdk.harman.com",
 		newsURL: "https://airsdk.dev/news/archive", mirrorURL: "https://shockpkg.github.io/packages/api/1/packages.json",
 		apiTimeout: 6 * time.Second, retryDelay: time.Second, stallTimeout: 30 * time.Second}
-}
-
-func (a *app) loadSettings() error {
-	if a.settings != nil {
-		return nil
-	}
-	data, err := os.ReadFile(a.configFile)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("AIR SDK Manager settings not found: %s", a.configFile)
-		}
-		return err
-	}
-	a.settings = make(map[string]string)
-	for _, line := range strings.Split(strings.TrimPrefix(string(data), "\ufeff"), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		if key, value, ok := strings.Cut(line, "="); ok {
-			a.settings[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), "\"")
-		}
-	}
-	return nil
-}
-
-func (a *app) root() (string, error) {
-	if err := a.loadSettings(); err != nil {
-		return "", err
-	}
-	root := a.settings["AIR_SDKS"]
-	if root == "" {
-		return "", fmt.Errorf("AIR_SDKS is not set in %s", a.configFile)
-	}
-	return filepath.Abs(root)
-}
-
-func readSDK(path string) (installedSDK, error) {
-	data, err := os.ReadFile(filepath.Join(path, "air-sdk-description.xml"))
-	if err != nil {
-		return installedSDK{}, err
-	}
-	var description struct {
-		XMLName xml.Name `xml:"air-sdk-description"`
-		Version string   `xml:"version"`
-		Build   string   `xml:"build"`
-	}
-	if err = xml.Unmarshal(data, &description); err != nil {
-		return installedSDK{}, err
-	}
-	parts, err := versionParts(strings.TrimSpace(description.Version))
-	if err != nil || len(parts) < 3 {
-		return installedSDK{}, errors.New("invalid SDK description version")
-	}
-	v := sdkVersion{parts[0], parts[1], parts[2], -1}
-	if len(parts) == 4 {
-		v[3] = parts[3]
-	} else if strings.TrimSpace(description.Build) != "" {
-		build, err := versionParts(strings.TrimSpace(description.Build))
-		if err != nil || len(build) != 1 {
-			return installedSDK{}, errors.New("invalid SDK description build")
-		}
-		v[3] = build[0]
-	}
-	return installedSDK{v, path}, nil
-}
-
-func (a *app) installed() ([]installedSDK, error) {
-	root, err := a.root()
-	if err != nil {
-		return nil, err
-	}
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read SDK directory %s: %w", root, err)
-	}
-	var sdks []installedSDK
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".asm-") {
-			continue
-		}
-		if !entry.IsDir() {
-			if entry.Type()&os.ModeSymlink == 0 {
-				continue
-			}
-			info, err := os.Stat(filepath.Join(root, entry.Name()))
-			if err != nil || !info.IsDir() {
-				continue
-			}
-		}
-		sdk, err := readSDK(filepath.Join(root, entry.Name()))
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			a.ui.warning(fmt.Sprintf("Cannot read SDK description in %s: %v", filepath.Join(root, entry.Name()), err))
-			continue
-		}
-		sdks = append(sdks, sdk)
-	}
-	sort.Slice(sdks, func(i, j int) bool { return sdks[i].Version.newer(sdks[j].Version) })
-	return sdks, nil
 }
 
 func parseOptions(command string, args []string) (options, error) {
@@ -375,11 +205,6 @@ func (a *app) run(args []string) error {
 func validCommand(command string) bool {
 	return command == "list" || command == "search" || command == "install" || command == "update" || command == "uninstall" || command == "clean"
 }
-
-var newsLinks = regexp.MustCompile(`(?is)<a\b[^>]*\bhref="/news/\d{4}/\d{2}/\d{2}/[^"\s]+"[^>]*>(.*?)</a>`)
-var htmlTags = regexp.MustCompile(`<[^>]*>`)
-var newsNumber = regexp.MustCompile(`(?i)\bRelease\s+(\d+\.\d+\.\d+\.\d+)\b`)
-var previewTitle = regexp.MustCompile(`(?i)\b(beta|alpha|preview|pre[ -]?release)\b`)
 
 // finish reports how a run ended: the error that stopped it, or the blank
 // line that closes an interactive answer.
