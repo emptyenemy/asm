@@ -139,6 +139,10 @@ func (a *app) run(args []string) error {
 		a.ui.heading("Installed AIR SDKs")
 		if len(sdks) == 0 {
 			a.ui.say("No local AIR SDK versions found.", "")
+			if a.ui.interactive {
+				a.ui.gap()
+				a.ui.hint("Install:", "asm install latest")
+			}
 			return nil
 		}
 		var rows [][]string
@@ -222,6 +226,6 @@ func (a *app) finish(err error) error {
 func Run(args []string, version string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	a := newApp(ctx, newTerminal(os.Stdout, os.Stderr), version)
+	a := newApp(ctx, newTerminal(os.Stdin, os.Stdout, os.Stderr), version)
 	return a.finish(a.run(args))
 }

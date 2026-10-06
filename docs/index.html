@@ -85,7 +85,7 @@
       <h2 class="rule" id="why-title">why asm</h2>
       <dl class="opts">
         <div><dt>one binary</dt><dd>No runtime, no package manager, no admin rights. Download one file and run it.</dd></div>
-        <div><dt>your settings</dt><dd>Reads <code>~/.airsdk/airsdkmanager.cfg</code>, the file AIR SDK Manager writes. Your SDK folder stays where it is, and the manager's files are never rewritten.</dd></div>
+        <div><dt>no setup</dt><dd>Shares <code>~/.airsdk/airsdkmanager.cfg</code> with AIR SDK Manager, so both see the same SDKs. The first run fills in what is missing and leaves the manager's own lines alone.</dd></div>
         <div><dt>short versions</dt><dd><code>asm install 51.4</code> picks the newest stable build of that branch. An exact build such as <code>51.4.1.1</code> or <code>latest</code> works too.</dd></div>
         <div><dt>resumable</dt><dd>A dropped connection is not a lost download. The next attempt, or the next run, continues from the bytes already on disk.</dd></div>
         <div><dt>verified</dt><dd>Every archive is checked against its published size and SHA-256 before a single file is unpacked.</dd></div>
@@ -137,15 +137,15 @@
 
         <h3>OPTIONS</h3>
         <dl class="ind cmds">
-          <dt><b>--accept-license</b></dt><dd>Accept the AIR SDK license for this <b>install</b> or <b>update</b> only. Nothing is written to disk.</dd>
+          <dt><b>--accept-license</b></dt><dd>Accept the AIR SDK license for this <b>install</b> or <b>update</b> only, without the question. Nothing is written to disk.</dd>
           <dt><b>--version</b>, <b>-v</b></dt><dd>Print the asm version.</dd>
         </dl>
 
         <h3>FILES</h3>
         <div class="ind">
-          <p><code>~/.airsdk/airsdkmanager.cfg</code>, the AIR SDK Manager settings. <code>%USERPROFILE%</code> stands for <code>~</code> on Windows.</p>
+          <p><code>~/.airsdk/airsdkmanager.cfg</code>, the settings asm shares with AIR SDK Manager. <code>%USERPROFILE%</code> stands for <code>~</code> on Windows. The first run creates it with <code>AIR_SDKS=~/sdks/air</code> unless the manager has set a folder, and a yes to the license question adds the second line.</p>
 <pre class="cfg"><span class="k">AIR_SDKS</span>=C:\AIRSDK              <span class="c"># where SDKs are installed</span>
-<span class="k">HAS_ACCEPTED_LICENSE</span>=true       <span class="c"># or --accept-license per run</span></pre>
+<span class="k">HAS_ACCEPTED_LICENSE</span>=true       <span class="c"># saved when you accept</span></pre>
         </div>
 
         <h3>ENVIRONMENT</h3>
@@ -171,7 +171,7 @@ asm update --all</pre>
       <div class="faq">
         <details>
           <summary>Do I need AIR SDK Manager installed?</summary>
-          <p>No, only its settings file. Create <code>~/.airsdk/airsdkmanager.cfg</code> with an <code>AIR_SDKS</code> line pointing at the folder for your SDKs, and asm takes it from there.</p>
+          <p>No. On the first run asm creates <code>~/.airsdk/airsdkmanager.cfg</code> and puts SDKs in <code>~/sdks/air</code>, the folder the AIR SDK guides recommend. If AIR SDK Manager is already set up, asm uses its folder, and both tools keep seeing the same SDKs.</p>
         </details>
         <details>
           <summary>Does asm switch the SDK my project uses?</summary>

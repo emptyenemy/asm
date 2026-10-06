@@ -35,9 +35,10 @@ settings AIR SDK Manager already keeps: no runtime, no GUI, no admin rights.
 
 - **Short versions.** `asm install 51.4` picks the newest stable 51.4 build.
   An exact build such as `51.4.1.1`, or `latest`, works too.
-- **Your existing setup.** asm reads `~/.airsdk/airsdkmanager.cfg`, the file
-  AIR SDK Manager writes. Your SDK folder stays where it is, and the manager's
-  files are never rewritten.
+- **One set of settings with AIR SDK Manager.** asm keeps its settings in
+  `~/.airsdk/airsdkmanager.cfg`, the manager's own file, so both tools see the
+  same SDKs. Nothing to set up: asm fills in what is missing and leaves the
+  manager's lines alone.
 - **Downloads that survive.** A dropped connection resumes from the bytes
   already on disk, on the next attempt or on the next run.
 - **Verified before unpacking.** Every archive is checked against its published
@@ -126,28 +127,34 @@ the symbol table and debug information and disables cgo;
 
 ## Quick start
 
-asm uses the AIR SDK Manager settings. If you have run the manager, there is
-nothing to set up. Otherwise create `~/.airsdk/airsdkmanager.cfg`
-(`%USERPROFILE%\.airsdk\airsdkmanager.cfg` on Windows):
-
-```ini
-AIR_SDKS=C:\AIRSDK
-HAS_ACCEPTED_LICENSE=true
-```
-
-`AIR_SDKS` is the folder for your SDKs, wherever you like. The second line
-records that you accept the AIR SDK license; leave it out and pass
-`--accept-license` to a single `install` or `update` instead. The flag changes
-nothing on disk.
-
-Then:
-
 ```sh
 asm search 51.4      # stable releases in the 51.4 branch
 asm install 51.4     # the newest of them
 asm list             # what is installed, and where
 asm update           # newer builds for what you have
 ```
+
+There is nothing to configure first. asm shares its settings with AIR SDK
+Manager in `~/.airsdk/airsdkmanager.cfg`
+(`%USERPROFILE%\.airsdk\airsdkmanager.cfg` on Windows):
+
+- **SDK folder.** If the manager is set up, asm uses its folder. Otherwise the
+  first run creates the file with `AIR_SDKS` set to `~/sdks/air`, the folder
+  the AIR SDK installation guides recommend, and says so.
+- **License.** The first install shows where to read the AIR SDK license and
+  asks you to accept it. A yes is saved as `HAS_ACCEPTED_LICENSE=true`, the
+  same line the manager writes, so neither tool asks again. In scripts and CI,
+  where nobody can answer, pass `--accept-license`; it covers that one run and
+  changes nothing on disk.
+
+To keep SDKs elsewhere, set the folder before the first install:
+
+```ini
+AIR_SDKS=D:\AIRSDK
+```
+
+asm only ever adds or updates these two lines. Comments, other settings and
+the file's line endings stay as the manager left them.
 
 ## Commands
 
@@ -191,9 +198,8 @@ Manager. Folder names do not matter: the version comes from
 `<build>3</build>` make `51.3.4.3`. A four-component `<version>` is read as is.
 
 Versions are sorted numerically, newest first. Folders without a description
-are skipped, and an unreadable description produces a warning. Missing
-settings, an empty `AIR_SDKS` or a missing SDK folder are errors. An existing
-empty folder prints a message and exits with `0`.
+are skipped, and an unreadable description produces a warning. An SDK folder
+that is empty, or not created yet, prints a message and exits with `0`.
 
 </details>
 
@@ -392,9 +398,9 @@ rules.
   but downloading a real SDK has not been checked everywhere. If something
   breaks, [open an issue](https://github.com/emptyenemy/asm/issues) with the
   command and its output.
-- **The AIR SDK license is yours to accept.** asm downloads nothing until it
-  has been accepted, in the manager settings or with `--accept-license` for a
-  single operation.
+- **The AIR SDK license is yours to accept.** asm downloads nothing until you
+  accept it: when asm asks, in the manager settings, or with
+  `--accept-license` for a single run.
 
 ## Contributing
 

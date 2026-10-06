@@ -235,6 +235,15 @@ Fixture checks run on all five release targets in GitHub Actions. The manager us
 home directory directly, rather than macOS Application Support or an XDG
 configuration directory. Nonstandard home directories must also work.
 
+asm writes the same file, and only two keys. When `AIR_SDKS` is missing, the
+first command that needs the SDK folder sets it to `~/sdks/air`, the location
+the [airsdk.dev installation guides](https://airsdk.dev/docs/basics/install/windows)
+recommend (`C:\Users\<user>\sdks\air`, `/Users/<user>/sdks/air`). A yes to the
+license question saves `HAS_ACCEPTED_LICENSE=true`, the line the manager writes
+when its license is accepted. `saveSetting` replaces the line that sets the key,
+or appends one, and keeps comments, other keys, a byte order mark and CRLF line
+endings as they were, so the manager reads the file exactly as before.
+
 ## Researching AIR SDK Manager
 
 The CLI was developed after inspecting the **Linux amd64 build of AIR SDK
@@ -352,7 +361,8 @@ rather than new features.
 
 The command set is deliberately small: `list`, `search`, `install`, `update`,
 `uninstall`, and `clean`. SDK selection, running tools, and other extras are
-out of scope. License acceptance remains explicit.
+out of scope. License acceptance remains explicit: a question in a terminal,
+`--accept-license` everywhere else, never a default.
 
 Go is the implementation language. Use its standard HTTP/ZIP support and keep
 the application small, adding layers only when a concrete feature needs them.

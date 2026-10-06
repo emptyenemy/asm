@@ -65,7 +65,7 @@ var helpTopics = map[string]helpTopic{
 		usage: "asm list", alias: "asm ls",
 		lines: []string{
 			"Lists installed SDK versions and paths, newest first.",
-			"Reads AIR_SDKS from ~/.airsdk/airsdkmanager.cfg.",
+			"Reads AIR_SDKS from ~/.airsdk/airsdkmanager.cfg; the first run sets it to ~/sdks/air.",
 		},
 	},
 	"search": {
@@ -83,6 +83,7 @@ var helpTopics = map[string]helpTopic{
 			"Installs into AIR_SDKS; an installed build is kept.",
 			"Falls back to the mirror if the official API fails.",
 			"An interrupted download resumes on the next attempt.",
+			"Asks once to accept the AIR SDK license and saves the answer.",
 		},
 		options: [][2]string{{"--accept-license", "Accept the AIR SDK license for this operation."}},
 	},

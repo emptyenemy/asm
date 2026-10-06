@@ -84,8 +84,8 @@ func (a *app) update(o options) error {
 		}
 		return nil
 	}
-	if !o.license && a.settings["HAS_ACCEPTED_LICENSE"] != "true" {
-		return errors.New("accept the AIR SDK license using --accept-license, or use AIR SDK Manager first")
+	if err := a.acceptLicense(o); err != nil {
+		return err
 	}
 	root, err := a.root()
 	if err != nil {

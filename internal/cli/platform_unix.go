@@ -26,6 +26,9 @@ func terminalWidth(file *os.File) int {
 
 func enableColor(files ...*os.File) bool { return true }
 
+// inputIsTerminal reports whether file is a keyboard rather than a pipe.
+func inputIsTerminal(file *os.File) bool { return terminalWidth(file) > 0 }
+
 func lockSDKRoot(root string) (func(), error) {
 	path := filepath.Join(root, ".asm-update.lock")
 	for attempt := 0; attempt < 3; attempt++ {

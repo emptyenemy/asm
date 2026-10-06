@@ -45,6 +45,13 @@ func enableColor(files ...*os.File) bool {
 	return true
 }
 
+// inputIsTerminal reports whether file is a console rather than a pipe.
+func inputIsTerminal(file *os.File) bool {
+	var mode uint32
+	ok, _, _ := getConsoleMode.Call(file.Fd(), uintptr(unsafe.Pointer(&mode)))
+	return ok != 0
+}
+
 func lockSDKRoot(root string) (func(), error) {
 	path := filepath.Join(root, ".asm-update.lock")
 	name, err := syscall.UTF16PtrFromString(path)

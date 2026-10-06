@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -17,19 +19,48 @@ type terminal struct {
 	out, err           io.Writer
 	interactive, color bool
 	width              func() int
-	opened, blank      bool // the answer has started; the last line was empty
+	opened, blank      bool      // the answer has started; the last line was empty
+	in                 io.Reader // the keyboard, when there is one to ask
 }
 
-func newTerminal(out, err *os.File) *terminal {
+func newTerminal(in, out, err *os.File) *terminal {
 	interactive := terminalWidth(out) > 0 && terminalWidth(err) > 0 && os.Getenv("TERM") != "dumb"
 	_, noColor := os.LookupEnv("NO_COLOR")
 	color := interactive && !noColor && enableColor(out, err)
-	return &terminal{out: out, err: err, interactive: interactive, color: color, width: func() int {
+	t := &terminal{out: out, err: err, interactive: interactive, color: color, width: func() int {
 		if n := terminalWidth(out); n > 0 {
 			return n
 		}
 		return 80
 	}}
+	if interactive && inputIsTerminal(in) {
+		t.in = in
+	}
+	return t
+}
+
+// canAsk reports whether there is a person at the keyboard to answer.
+func (t *terminal) canAsk() bool { return t.in != nil }
+
+// ask puts a yes-or-no question and reads the answer. Only a yes counts, and
+// Ctrl+C while waiting ends the run instead of hanging on the read.
+func (t *terminal) ask(ctx context.Context, question string) (bool, error) {
+	t.open()
+	fmt.Fprint(t.err, "  "+t.style(question, "accent")+" ")
+	t.blank = false
+	answer := make(chan string, 1)
+	go func() {
+		line, _ := bufio.NewReader(t.in).ReadString('\n')
+		answer <- line
+	}()
+	select {
+	case <-ctx.Done():
+		fmt.Fprintln(t.err)
+		return false, ctx.Err()
+	case line := <-answer:
+		reply := strings.ToLower(strings.TrimSpace(line))
+		return reply == "y" || reply == "yes", nil
+	}
 }
 
 var styles = map[string]string{
@@ -158,6 +189,9 @@ func (t *terminal) labeled(w io.Writer, label, labelStyle, text, textStyle strin
 
 // pair prints a labeled value, such as a path.
 func (t *terminal) pair(label, value string) { t.labeled(t.out, label, "muted", value, "", true) }
+
+// note prints a labeled value on stderr, beside the answer rather than in it.
+func (t *terminal) note(label, value string) { t.labeled(t.err, label, "muted", value, "", true) }
 
 // hint suggests the command to run next.
 func (t *terminal) hint(label, command string) {

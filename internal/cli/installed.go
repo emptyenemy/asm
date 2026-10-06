@@ -51,6 +51,9 @@ func (a *app) installed() ([]installedSDK, error) {
 		return nil, err
 	}
 	entries, err := os.ReadDir(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil // the first install creates it
+	}
 	if err != nil {
 		return nil, fmt.Errorf("cannot read SDK directory %s: %w", root, err)
 	}

@@ -69,8 +69,8 @@ func (a *app) install(o options) error {
 	if occupied(destination) {
 		return fmt.Errorf("installation path is already occupied: %s", destination)
 	}
-	if !o.license && a.settings["HAS_ACCEPTED_LICENSE"] != "true" {
-		return errors.New("accept the AIR SDK license using --accept-license, or use AIR SDK Manager first")
+	if err := a.acceptLicense(o); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return err
