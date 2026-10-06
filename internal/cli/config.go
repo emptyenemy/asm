@@ -122,7 +122,7 @@ func (a *app) acceptLicense(o options) error {
 	return a.saveSetting("HAS_ACCEPTED_LICENSE", "true")
 }
 
-// endpoint returns the HARMAN API base: API_ENDPOINT from the manager
+// endpoint returns the AIR SDK API base: API_ENDPOINT from the manager
 // configuration, or the official service.
 func (a *app) endpoint() string {
 	if a.settings == nil {

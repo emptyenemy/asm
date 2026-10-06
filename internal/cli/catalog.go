@@ -104,7 +104,7 @@ func releaseNumbers(builds []manifest) ([]sdkVersion, error) {
 	return result, nil
 }
 
-// fetchAPIReleases reads the production release list from the HARMAN API. A
+// fetchAPIReleases reads the production release list from the AIR SDK API. A
 // response without a releases array is an error rather than an empty catalog.
 func (a *app) fetchAPIReleases() ([]sdkVersion, error) {
 	data, err := a.metadata(a.endpoint()+"/releases?types=production", "Checking AIR SDK releases", a.apiTimeout)

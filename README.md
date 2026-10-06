@@ -410,5 +410,5 @@ the AIR SDK sources asm talks to.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). asm is an independent project. The AIR SDK itself
-is a separate product licensed by HARMAN.
+MIT, see [LICENSE](LICENSE). asm is an independent project, not an official
+AIR SDK tool. The AIR SDK itself is a separate product under its own license.
